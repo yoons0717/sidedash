@@ -33,6 +33,12 @@ export function runAction(project, allProjects, { onData, onExit } = {}) {
     runningProjects.delete(project.path);
     onExit?.(code);
   });
+
+  child.on('error', (err) => {
+    runningProjects.delete(project.path);
+    onData?.(`명령을 실행할 수 없습니다: ${err.message}\n`);
+    onExit?.(null);
+  });
 }
 
 export { runningProjects };

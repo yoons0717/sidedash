@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
-import { shellQuote } from './run.js';
+import { runAction, runningProjects, shellQuote } from './run.js';
 
 describe('shellQuote', () => {
   it('wraps a plain string in single quotes', () => {
@@ -29,5 +29,25 @@ describe('shellQuote', () => {
     const output = execFileSync('/bin/zsh', ['-lc', `printf '%s\\n' ${quoted}`]).toString();
 
     expect(output.split('\n').filter(Boolean)).toEqual([original]);
+  });
+});
+
+describe('runAction', () => {
+  it('clears runningProjects and reports failure when the process fails to spawn', async () => {
+    // A cwd that does not exist makes the OS-level spawn itself fail (ENOENT),
+    // which emits 'error' on the ChildProcess instead of a normal 'exit'.
+    const project = { path: '/no/such/directory/for-sidedash-spawn-error-test', actionType: 'pdf' };
+    const dataChunks = [];
+
+    const exitCode = await new Promise((resolve) => {
+      runAction(project, [], {
+        onData: (chunk) => dataChunks.push(chunk),
+        onExit: (code) => resolve(code),
+      });
+    });
+
+    expect(exitCode).toBeNull();
+    expect(runningProjects.has(project.path)).toBe(false);
+    expect(dataChunks.join('')).toContain('명령을 실행할 수 없습니다');
   });
 });
