@@ -10,9 +10,23 @@
         font-family: -apple-system, BlinkMacSystemFont, sans-serif;
         font-size: 14px;
       }
+      .card {
+        padding: 8px 0;
+        border-bottom: 1px solid #e0e0e0;
+      }
+      .card-title {
+        font-weight: 600;
+      }
+      .card-detail {
+        color: #666;
+        font-size: 12px;
+        margin-top: 2px;
+      }
     </style>
   </head>
   <body>
-    <div>내 프로젝트 (0)</div>
+    <div>내 프로젝트 (<span id="project-count">0</span>)</div>
+    <div id="project-list"></div>
+    <script src="renderer/app.js"></script>
   </body>
 </html>
