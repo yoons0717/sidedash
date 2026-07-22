@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as registry from 'reentry-cli/src/registry.js';
-import { getLastCommit, getGitStatus, getPackageScripts, findTodos } from 'reentry-cli/src/scanner.js';
+import { getLastCommit, getGitStatus, getGitHubUrl } from 'reentry-cli/src/scanner.js';
 import { detectAction } from '../actions/detect.js';
 import { getLastRun } from '../actions/history.js';
 
@@ -33,9 +33,11 @@ export function getProjectCards(historyFilePath) {
         branch: null,
         lastCommit: null,
         hasUncommittedChanges: false,
+        changedFileCount: 0,
         pathExists,
         action: null,
         lastRun,
+        githubUrl: null,
       };
     }
 
@@ -48,16 +50,11 @@ export function getProjectCards(historyFilePath) {
       branch: gitStatus?.branch ?? null,
       lastCommit,
       hasUncommittedChanges: gitStatus?.hasUncommittedChanges ?? false,
+      changedFileCount: gitStatus?.changedFileCount ?? 0,
       pathExists,
       action: detectAction(path),
       lastRun,
+      githubUrl: getGitHubUrl(path),
     };
   });
-}
-
-export function getProjectDetail(path) {
-  return {
-    todoCount: findTodos(path).length,
-    scripts: getPackageScripts(path),
-  };
 }

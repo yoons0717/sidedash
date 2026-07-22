@@ -1,11 +1,12 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, ipcMain, dialog, Notification } from 'electron';
+import { app, ipcMain, dialog, shell, Notification } from 'electron';
 import { menubar } from 'menubar';
 import * as registry from 'reentry-cli/src/registry.js';
-import { getProjectCards, getProjectDetail, canAddProject } from './ipc/projects.js';
+import { getProjectCards, canAddProject } from './ipc/projects.js';
 import { runAction, isRunning, hasRunningActions, killAllRunning } from './actions/run.js';
 import { recordRun } from './actions/history.js';
+import { getUncommittedFiles } from './actions/git.js';
 import { openLogWindow } from './logwindow.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -59,7 +60,9 @@ ipcMain.handle('remove-project', (event, name) => {
   return getProjectCards(HISTORY_FILE);
 });
 
-ipcMain.handle('get-project-detail', (event, projectPath) => getProjectDetail(projectPath));
+ipcMain.handle('open-external', (event, url) => shell.openExternal(url));
+
+ipcMain.handle('get-uncommitted-files', (event, projectPath) => getUncommittedFiles(projectPath));
 
 ipcMain.handle('quit-app', async () => {
   if (hasRunningActions()) {

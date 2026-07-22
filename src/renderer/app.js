@@ -11,6 +11,7 @@ const DEFAULT_ICON = { text: '📁', className: '' };
 
 const runningPaths = new Set();
 let currentProjects = [];
+let sortMode = 'recent';
 
 function formatRelativeTime(isoString, now = new Date()) {
   const diffMs = now.getTime() - new Date(isoString).getTime();
@@ -23,22 +24,26 @@ function formatRelativeTime(isoString, now = new Date()) {
   return `${days}일 전`;
 }
 
+function sortProjects(projects) {
+  const sorted = [...projects];
+  if (sortMode === 'name') {
+    sorted.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  } else {
+    // Projects with no commit date (missing path, no commits yet) sort last.
+    sorted.sort((a, b) => {
+      const aTime = a.lastCommit ? new Date(a.lastCommit.date).getTime() : -Infinity;
+      const bTime = b.lastCommit ? new Date(b.lastCommit.date).getTime() : -Infinity;
+      return bTime - aTime;
+    });
+  }
+  return sorted;
+}
+
 function setActionButtonState(actionBtn, project) {
   const running = runningPaths.has(project.path);
   actionBtn.disabled = running;
   actionBtn.classList.toggle('card-action-running', running);
   actionBtn.textContent = running ? '실행 중…' : ACTION_LABELS[project.action];
-}
-
-// The detail panel (card-expanded) and the target-select panel are toggled
-// independently, but both share the same "expanded-style" card background.
-// Deriving it from current visibility (rather than each toggle handler
-// setting it directly) keeps the two from clobbering each other's state.
-function syncExpandedStyle(card) {
-  const anyPanelOpen = [...card.querySelectorAll('.card-expanded, .target-select')].some(
-    (panel) => panel.style.display !== 'none'
-  );
-  card.classList.toggle('expanded-style', anyPanelOpen);
 }
 
 async function handleRunAction(project, actionBtn, targetPaths) {
@@ -50,13 +55,53 @@ async function handleRunAction(project, actionBtn, targetPaths) {
   await window.api.runAction(project.path, targetPaths);
 }
 
+// A card can have a target-select panel (pipeline action) and a files panel
+// (uncommitted changes) at the same time — deriving expanded-style from
+// current visibility (rather than each toggle setting it directly) keeps
+// the two from clobbering each other's state when only one closes.
+function syncExpandedStyle(card) {
+  const anyOpen = [...card.querySelectorAll('.target-select, .card-files')].some(
+    (panel) => panel.style.display !== 'none'
+  );
+  card.classList.toggle('expanded-style', anyOpen);
+}
+
+function buildFilesPanel() {
+  const panel = document.createElement('div');
+  panel.className = 'card-files';
+  panel.style.display = 'none';
+  return panel;
+}
+
+async function toggleFilesPanel(project, panel, card) {
+  const isOpen = panel.style.display !== 'none';
+  if (isOpen) {
+    panel.style.display = 'none';
+    syncExpandedStyle(card);
+    return;
+  }
+
+  if (!panel.dataset.loaded) {
+    const files = await window.api.getUncommittedFiles(project.path);
+    for (const { status, file } of files) {
+      const line = document.createElement('div');
+      line.className = 'card-files-line';
+      line.textContent = `${status} ${file}`;
+      panel.appendChild(line);
+    }
+    panel.dataset.loaded = 'true';
+  }
+
+  panel.style.display = 'block';
+  syncExpandedStyle(card);
+}
+
 function buildTargetSelectPanel(project, card, actionBtn) {
   const panel = document.createElement('div');
   panel.className = 'target-select';
   panel.style.display = 'none';
   // Without this, clicking a checkbox (or anywhere else in the panel) would
-  // bubble up to the card's own click-to-expand handler and collapse the
-  // whole card mid-selection.
+  // bubble up past the action button's own stopPropagation.
   panel.addEventListener('click', (event) => event.stopPropagation());
 
   const otherProjects = currentProjects.filter((p) => p.path !== project.path);
@@ -114,11 +159,6 @@ function buildTargetSelectPanel(project, card, actionBtn) {
 function renderCard(project) {
   const card = document.createElement('div');
   card.className = 'card';
-  // The action/remove buttons and the target-select panel's own buttons all
-  // stopPropagation(), so attaching the expand toggle here (rather than just
-  // the header row) makes the whole card clickable without those controls
-  // accidentally triggering it too.
-  card.addEventListener('click', () => toggleExpanded(card, project));
 
   const icon = ACTION_ICONS[project.action] ?? DEFAULT_ICON;
   const iconEl = document.createElement('div');
@@ -136,6 +176,18 @@ function renderCard(project) {
   title.className = 'card-title';
   title.textContent = project.name;
   header.appendChild(title);
+
+  if (project.githubUrl) {
+    const githubBtn = document.createElement('button');
+    githubBtn.className = 'card-github';
+    githubBtn.textContent = '🔗';
+    githubBtn.title = 'GitHub에서 열기';
+    githubBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      window.api.openExternal(project.githubUrl);
+    });
+    header.appendChild(githubBtn);
+  }
 
   let targetSelectPanel = null;
   let actionBtn = null;
@@ -170,17 +222,38 @@ function renderCard(project) {
   body.appendChild(header);
 
   const detail = document.createElement('div');
+  detail.className = 'card-detail';
+  let filesPanel = null;
+
   if (!project.pathExists) {
-    detail.className = 'card-detail missing';
+    detail.classList.add('missing');
     detail.textContent = '경로를 찾을 수 없음';
   } else {
-    detail.className = project.hasUncommittedChanges ? 'card-detail dirty' : 'card-detail';
     const branch = project.branch ?? '(알 수 없음)';
     const commitMessage = project.lastCommit ? project.lastCommit.message : '(커밋 없음)';
-    const dirty = project.hasUncommittedChanges ? ' · 미커밋 변경사항 있음' : '';
-    detail.textContent = `${branch} · ${commitMessage}${dirty}`;
+
+    const branchSpan = document.createElement('span');
+    branchSpan.className = 'card-branch';
+    branchSpan.textContent = branch;
+    detail.appendChild(branchSpan);
+    detail.appendChild(document.createTextNode(` · ${commitMessage}`));
   }
   body.appendChild(detail);
+
+  if (project.hasUncommittedChanges) {
+    const dirtyLine = document.createElement('div');
+    dirtyLine.className = 'card-dirty-toggle';
+    dirtyLine.textContent = `미커밋 변경사항 ${project.changedFileCount}개`;
+    body.appendChild(dirtyLine);
+
+    filesPanel = buildFilesPanel();
+    body.appendChild(filesPanel);
+    // Only dirty cards have anything to expand — clicking a clean card
+    // (or a pipeline card's target-select area, which stopPropagates)
+    // does nothing.
+    card.classList.add('clickable');
+    card.addEventListener('click', () => toggleFilesPanel(project, filesPanel, card));
+  }
 
   if (project.action && project.lastRun) {
     const lastRunEl = document.createElement('div');
@@ -188,11 +261,6 @@ function renderCard(project) {
     lastRunEl.textContent = `마지막 실행: ${formatRelativeTime(project.lastRun)}`;
     body.appendChild(lastRunEl);
   }
-
-  const expanded = document.createElement('div');
-  expanded.className = 'card-expanded';
-  expanded.style.display = 'none';
-  body.appendChild(expanded);
 
   if (project.action === 'pipeline') {
     targetSelectPanel = buildTargetSelectPanel(project, card, actionBtn);
@@ -204,37 +272,6 @@ function renderCard(project) {
   return card;
 }
 
-async function toggleExpanded(card, project) {
-  const expanded = card.querySelector('.card-expanded');
-  if (expanded.style.display !== 'none') {
-    expanded.style.display = 'none';
-    syncExpandedStyle(card);
-    return;
-  }
-
-  if (!project.pathExists) {
-    return;
-  }
-
-  if (!expanded.dataset.loaded) {
-    const { todoCount, scripts } = await window.api.getProjectDetail(project.path);
-    const scriptNames = Object.keys(scripts);
-
-    const todoLine = document.createElement('div');
-    todoLine.textContent = `TODO/FIXME: ${todoCount}개`;
-    expanded.appendChild(todoLine);
-
-    const scriptsLine = document.createElement('div');
-    scriptsLine.textContent = scriptNames.length > 0 ? `scripts: ${scriptNames.join(', ')}` : 'scripts: 없음';
-    expanded.appendChild(scriptsLine);
-
-    expanded.dataset.loaded = 'true';
-  }
-
-  expanded.style.display = 'block';
-  syncExpandedStyle(card);
-}
-
 function renderProjects(projects) {
   const listEl = document.getElementById('project-list');
   const countEl = document.getElementById('project-count');
@@ -242,14 +279,22 @@ function renderProjects(projects) {
   currentProjects = projects;
   countEl.textContent = String(projects.length);
   listEl.innerHTML = '';
-  projects.forEach((project, index) => {
+  const sorted = sortProjects(projects);
+  sorted.forEach((project, index) => {
     listEl.appendChild(renderCard(project));
-    if (index < projects.length - 1) {
+    if (index < sorted.length - 1) {
       const divider = document.createElement('div');
       divider.className = 'divider';
       listEl.appendChild(divider);
     }
   });
+}
+
+function setSortMode(mode) {
+  sortMode = mode;
+  document.getElementById('sort-recent').classList.toggle('active', mode === 'recent');
+  document.getElementById('sort-name').classList.toggle('active', mode === 'name');
+  renderProjects(currentProjects);
 }
 
 async function handleRemove(name) {
@@ -274,6 +319,8 @@ async function handleActionExited({ path }) {
 async function init() {
   document.getElementById('add-project').addEventListener('click', handleAdd);
   document.getElementById('quit-app').addEventListener('click', () => window.api.quitApp());
+  document.getElementById('sort-recent').addEventListener('click', () => setSortMode('recent'));
+  document.getElementById('sort-name').addEventListener('click', () => setSortMode('name'));
   window.api.onActionExited(handleActionExited);
 
   const projects = await window.api.getProjectCards();

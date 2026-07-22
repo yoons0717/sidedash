@@ -43,6 +43,24 @@
       .add-btn:hover {
         background: #35355a;
       }
+      .sort-toggle {
+        display: flex;
+        gap: 12px;
+        padding: 0 18px 8px;
+        flex-shrink: 0;
+      }
+      .sort-btn {
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-size: 11px;
+        color: #7a7a95;
+        padding: 2px 0;
+      }
+      .sort-btn.active {
+        color: #9b9bf0;
+        font-weight: 600;
+      }
       #project-list {
         flex: 1;
         overflow-y: auto;
@@ -55,10 +73,12 @@
         border-radius: 10px;
         box-sizing: border-box;
         border: 1px solid transparent;
-        cursor: pointer;
         transition: background-color 0.1s ease;
       }
-      .card:hover {
+      .card.clickable {
+        cursor: pointer;
+      }
+      .card.clickable:hover {
         background: #20203a;
       }
       .card.expanded-style {
@@ -111,11 +131,32 @@
         color: #9a9ab8;
         margin-top: 6px;
       }
-      .card-detail.dirty {
-        color: #e0a458;
-      }
       .card-detail.missing {
         color: #e05858;
+      }
+      .card-dirty-toggle {
+        font-size: 12px;
+        color: #e0a458;
+        margin-top: 4px;
+      }
+      .card-branch {
+        color: #6fc9d6;
+        font-weight: 600;
+      }
+      .card-files {
+        margin-top: 8px;
+        padding: 8px 10px;
+        background: #22223a;
+        border-radius: 8px;
+        font-family: Menlo, Consolas, monospace;
+        font-size: 11px;
+        color: #b5b5d0;
+        line-height: 1.6;
+      }
+      .card-files-line {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .card-last-run {
         font-size: 11px;
@@ -142,6 +183,21 @@
         color: #9a9ab8;
         cursor: default;
       }
+      .card-github {
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-size: 12px;
+        padding: 6px;
+        border-radius: 6px;
+        line-height: 1;
+        opacity: 0.7;
+        transition: opacity 0.1s ease, background-color 0.1s ease;
+      }
+      .card-github:hover {
+        opacity: 1;
+        background: #2c2c46;
+      }
       .card-remove {
         border: none;
         background: none;
@@ -157,7 +213,6 @@
         color: #d8d8e8;
         background: #2c2c46;
       }
-      .card-expanded,
       .target-select {
         margin-top: 10px;
         padding-top: 10px;
@@ -264,6 +319,10 @@
     <div class="header">
       <div class="header-title">내 프로젝트 (<span id="project-count">0</span>)</div>
       <button id="add-project" class="add-btn">＋</button>
+    </div>
+    <div class="sort-toggle">
+      <button id="sort-recent" class="sort-btn active">최근순</button>
+      <button id="sort-name" class="sort-btn">이름순</button>
     </div>
     <div id="project-list"></div>
     <div class="footer">
