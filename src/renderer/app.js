@@ -46,13 +46,32 @@ function setActionButtonState(actionBtn, project) {
   actionBtn.textContent = running ? '실행 중…' : ACTION_LABELS[project.action];
 }
 
+// Marks the button running optimistically, before run-action resolves —
+// so it needs to be undone whenever the call turns out not to have actually
+// started anything. "already-running" is the one exception: that means a
+// real run *is* in progress (started by an earlier, still-in-flight click),
+// so the button stays disabled and self-clears when that run's own
+// action-exited arrives. Every other case (invalid project, or the IPC
+// call itself rejecting) has no run in flight to fix it later, so it's
+// undone right here — otherwise the button is stuck on "실행 중…" until
+// the app restarts.
 async function handleRunAction(project, actionBtn, targetPaths) {
   if (runningPaths.has(project.path)) {
     return;
   }
   runningPaths.add(project.path);
   setActionButtonState(actionBtn, project);
-  await window.api.runAction(project.path, targetPaths);
+  try {
+    const result = await window.api.runAction(project.path, targetPaths);
+    if (result?.ok === false && result.reason !== 'already-running') {
+      runningPaths.delete(project.path);
+      setActionButtonState(actionBtn, project);
+    }
+  } catch (err) {
+    console.error('run-action failed:', err);
+    runningPaths.delete(project.path);
+    setActionButtonState(actionBtn, project);
+  }
 }
 
 // A card can have a target-select panel (pipeline action) and a files panel
@@ -340,22 +359,38 @@ function setSortMode(mode) {
 }
 
 async function handleRemove(name) {
-  const projects = await window.api.removeProject(name);
-  renderProjects(projects);
+  try {
+    const projects = await window.api.removeProject(name);
+    renderProjects(projects);
+  } catch (err) {
+    console.error('remove-project failed:', err);
+  }
 }
 
 async function handleAdd() {
-  const projects = await window.api.addProject();
-  renderProjects(projects);
+  try {
+    const projects = await window.api.addProject();
+    renderProjects(projects);
+  } catch (err) {
+    console.error('add-project failed:', err);
+  }
+}
+
+async function refreshProjects() {
+  try {
+    const projects = await window.api.getProjectCards();
+    renderProjects(projects);
+  } catch (err) {
+    console.error('get-project-cards failed:', err);
+  }
 }
 
 async function handleActionExited({ path }) {
   runningPaths.delete(path);
-  // Re-fetch rather than just resetting the button: a successful run updates
-  // lastRun on disk, and the card needs fresh data to show it without
-  // waiting for the next app restart.
-  const projects = await window.api.getProjectCards();
-  renderProjects(projects);
+  // Re-fetch rather than just resetting the button: a successful run
+  // updates lastRun on disk, and the card needs fresh data to show it
+  // without waiting for the next app restart.
+  await refreshProjects();
 }
 
 async function init() {
@@ -371,12 +406,11 @@ async function init() {
   // happens to run and refresh it as a side effect.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      window.api.getProjectCards().then(renderProjects);
+      refreshProjects();
     }
   });
 
-  const projects = await window.api.getProjectCards();
-  renderProjects(projects);
+  await refreshProjects();
 }
 
 init();

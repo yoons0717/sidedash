@@ -137,18 +137,25 @@ const ACTION_LABELS = {
   pdf: 'PDF 생성',
 };
 
+// Return value lets the renderer tell "genuinely didn't start, re-enable the
+// button now" apart from "already running elsewhere, leave it disabled —
+// the real run's own action-exited will clear it". Collapsing both into a
+// bare no-op return left the renderer with no way to distinguish them: it
+// optimistically marks the button running before this call resolves, and
+// nothing ever un-marks it for the "didn't start" case since no run started
+// to eventually fire action-exited.
 ipcMain.handle('run-action', (event, projectPath, targetPaths) => {
   const cards = getProjectCards(HISTORY_FILE);
   const project = cards.find((p) => p.path === projectPath);
   if (!project || !project.action) {
-    return;
+    return { ok: false, reason: 'invalid' };
   }
 
   // Check the backend-authoritative guard *before* opening the log window —
   // otherwise a suppressed duplicate run (e.g. renderer state lost after a
   // popup reload) opens a window that never receives data or an exit signal.
   if (isRunning(project.path)) {
-    return;
+    return { ok: false, reason: 'already-running' };
   }
 
   const projectWithType = { ...project, actionType: project.action };
@@ -178,6 +185,8 @@ ipcMain.handle('run-action', (event, projectPath, targetPaths) => {
       },
     }
   );
+
+  return { ok: true };
 });
 
 mb.on('ready', () => {
