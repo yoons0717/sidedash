@@ -1,9 +1,17 @@
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createUtf8Decoder, isRunning, runAction, runningProjects, shellQuote } from './run.js';
+import {
+  createUtf8Decoder,
+  hasRunningActions,
+  isRunning,
+  killAllRunning,
+  runAction,
+  runningProjects,
+  shellQuote,
+} from './run.js';
 
 describe('shellQuote', () => {
   it('wraps a plain string in single quotes', () => {
@@ -95,6 +103,45 @@ describe('runAction', () => {
     });
 
     expect(isRunning(project.path)).toBe(false);
+  });
+
+  it('killAllRunning() terminates the whole process tree, not just the top-level shell', async () => {
+    tempDir = mkdtempSync(path.join(tmpdir(), 'sidedash-kill-'));
+    const markerFile = path.join(tempDir, 'child.pid');
+    // run.sh's own zsh process forks a grandchild (sleep) in the background
+    // and writes ITS pid to a file — this proves whether killing the tracked
+    // child actually reaches descendants, not just the immediate shell.
+    writeFileSync(
+      path.join(tempDir, 'run.sh'),
+      '#!/bin/bash\nsleep 30 &\necho $! > child.pid\nwait\n'
+    );
+    chmodSync(path.join(tempDir, 'run.sh'), 0o755);
+
+    const project = { path: tempDir, actionType: 'pipeline' };
+
+    expect(hasRunningActions()).toBe(false);
+
+    const exitPromise = new Promise((resolve) => {
+      runAction(project, [], { onExit: (code) => resolve(code) });
+    });
+
+    // Give run.sh a moment to fork sleep and write its pid (login shell
+    // startup, e.g. loading .zshrc/nvm, can take a bit).
+    await new Promise((r) => setTimeout(r, 1000));
+
+    expect(hasRunningActions()).toBe(true);
+
+    const grandchildPid = Number(readFileSync(markerFile, 'utf-8').trim());
+
+    killAllRunning();
+    await exitPromise;
+
+    expect(hasRunningActions()).toBe(false);
+
+    // If only the top-level shell died, this grandchild `sleep` would still
+    // be alive; signalling it with 0 throws ESRCH once it's actually gone.
+    await new Promise((r) => setTimeout(r, 200));
+    expect(() => process.kill(grandchildPid, 0)).toThrow();
   });
 });
 

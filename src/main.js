@@ -4,7 +4,7 @@ import { app, ipcMain, dialog } from 'electron';
 import { menubar } from 'menubar';
 import * as registry from 'reentry-cli/src/registry.js';
 import { getProjectCards, getProjectDetail, canAddProject } from './ipc/projects.js';
-import { runAction, isRunning } from './actions/run.js';
+import { runAction, isRunning, hasRunningActions, killAllRunning } from './actions/run.js';
 import { openLogWindow } from './logwindow.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -59,7 +59,20 @@ ipcMain.handle('remove-project', (event, name) => {
 
 ipcMain.handle('get-project-detail', (event, projectPath) => getProjectDetail(projectPath));
 
-ipcMain.handle('quit-app', () => {
+ipcMain.handle('quit-app', async () => {
+  if (hasRunningActions()) {
+    const result = await dialog.showMessageBox(mb.window, {
+      type: 'warning',
+      buttons: ['종료', '취소'],
+      defaultId: 1,
+      cancelId: 1,
+      message: '실행 중인 작업이 있습니다. 지금 종료하면 작업이 중단됩니다. 그래도 종료할까요?',
+    });
+    if (result.response !== 0) {
+      return;
+    }
+    killAllRunning();
+  }
   app.quit();
 });
 

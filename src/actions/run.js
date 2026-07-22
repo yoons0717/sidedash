@@ -10,10 +10,29 @@ export function createUtf8Decoder() {
   return (chunk) => decoder.write(chunk);
 }
 
-const runningProjects = new Set();
+const runningProjects = new Map(); // project.path -> ChildProcess
 
 export function isRunning(projectPath) {
   return runningProjects.has(projectPath);
+}
+
+export function hasRunningActions() {
+  return runningProjects.size > 0;
+}
+
+// Kills each tracked action's whole process tree (the login shell plus
+// anything it forked — python3, node, a Chromium instance, etc.), not just
+// the immediate spawned shell. Requires runAction to spawn with
+// `detached: true`, which makes the child the leader of its own process
+// group; signalling the negative pid targets that entire group.
+export function killAllRunning() {
+  for (const child of runningProjects.values()) {
+    try {
+      process.kill(-child.pid, 'SIGTERM');
+    } catch {
+      // Process group may already be gone — nothing left to kill.
+    }
+  }
 }
 
 export function runAction(project, targetPaths, { onData, onExit } = {}) {
@@ -31,9 +50,8 @@ export function runAction(project, targetPaths, { onData, onExit } = {}) {
     return;
   }
 
-  runningProjects.add(project.path);
-
-  const child = spawn('/bin/zsh', ['-lc', command], { cwd: project.path });
+  const child = spawn('/bin/zsh', ['-lc', command], { cwd: project.path, detached: true });
+  runningProjects.set(project.path, child);
 
   const decodeStdout = createUtf8Decoder();
   const decodeStderr = createUtf8Decoder();
