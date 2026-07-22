@@ -14,8 +14,8 @@ app.dock.hide();
 const mb = menubar({
   index: `file://${path.join(__dirname, 'index.html')}`,
   browserWindow: {
-    width: 340,
-    height: 400,
+    width: 360,
+    height: 560,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
     },
@@ -30,12 +30,15 @@ const ADD_REJECTION_MESSAGES = {
 };
 
 ipcMain.handle('add-project', async () => {
-  const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+  // Passing the popup window as parent attaches these as sheets on macOS
+  // instead of separate windows — without it, the popup loses focus the
+  // moment the dialog opens and menubar's hide-on-blur closes it underneath.
+  const result = await dialog.showOpenDialog(mb.window, { properties: ['openDirectory'] });
   if (!result.canceled && result.filePaths.length > 0) {
     const projectPath = result.filePaths[0];
     const check = canAddProject(projectPath, registry.getAll());
     if (!check.ok) {
-      await dialog.showMessageBox({ type: 'warning', message: ADD_REJECTION_MESSAGES[check.reason] });
+      await dialog.showMessageBox(mb.window, { type: 'warning', message: ADD_REJECTION_MESSAGES[check.reason] });
       return getProjectCards();
     }
     const name = path.basename(projectPath);
@@ -55,7 +58,7 @@ ipcMain.handle('quit-app', () => {
   app.quit();
 });
 
-ipcMain.handle('run-action', (event, projectPath) => {
+ipcMain.handle('run-action', (event, projectPath, targetPaths) => {
   const cards = getProjectCards();
   const project = cards.find((p) => p.path === projectPath);
   if (!project || !project.action) {
@@ -74,7 +77,7 @@ ipcMain.handle('run-action', (event, projectPath) => {
 
   runAction(
     projectWithType,
-    cards,
+    targetPaths ?? [],
     {
       onData: (chunk) => logWindow.appendData(chunk),
       onExit: (code) => {

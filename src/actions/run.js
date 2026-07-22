@@ -16,15 +16,14 @@ export function isRunning(projectPath) {
   return runningProjects.has(projectPath);
 }
 
-export function runAction(project, allProjects, { onData, onExit } = {}) {
+export function runAction(project, targetPaths, { onData, onExit } = {}) {
   if (runningProjects.has(project.path)) {
     return;
   }
 
   let command;
   if (project.actionType === 'pipeline') {
-    const otherPaths = allProjects.filter((p) => p.path !== project.path).map((p) => p.path);
-    const quotedPaths = otherPaths.map(shellQuote);
+    const quotedPaths = targetPaths.map(shellQuote);
     command = './run.sh ' + quotedPaths.join(' ');
   } else if (project.actionType === 'pdf') {
     command = 'npm run pdf';

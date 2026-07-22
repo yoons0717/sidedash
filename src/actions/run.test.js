@@ -1,5 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { describe, expect, it } from 'vitest';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 import { createUtf8Decoder, isRunning, runAction, runningProjects, shellQuote } from './run.js';
 
 describe('shellQuote', () => {
@@ -33,6 +36,34 @@ describe('shellQuote', () => {
 });
 
 describe('runAction', () => {
+  let tempDir;
+
+  afterEach(() => {
+    if (tempDir) {
+      rmSync(tempDir, { recursive: true, force: true });
+      tempDir = undefined;
+    }
+  });
+
+  it('passes exactly the given targetPaths as quoted arguments to a pipeline action, nothing implicit', async () => {
+    tempDir = mkdtempSync(path.join(tmpdir(), 'sidedash-pipeline-'));
+    writeFileSync(path.join(tempDir, 'run.sh'), '#!/bin/bash\necho "$@"\n');
+    chmodSync(path.join(tempDir, 'run.sh'), 0o755);
+
+    const project = { path: tempDir, actionType: 'pipeline' };
+    const targetPaths = ['/Users/x/My Project', '/Users/x/other'];
+    const dataChunks = [];
+
+    await new Promise((resolve) => {
+      runAction(project, targetPaths, {
+        onData: (chunk) => dataChunks.push(chunk),
+        onExit: () => resolve(),
+      });
+    });
+
+    expect(dataChunks.join('').trim()).toBe('/Users/x/My Project /Users/x/other');
+  });
+
   it('clears runningProjects and reports failure when the process fails to spawn', async () => {
     // A cwd that does not exist makes the OS-level spawn itself fail (ENOENT),
     // which emits 'error' on the ChildProcess instead of a normal 'exit'.
