@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { app, ipcMain, dialog } from 'electron';
 import { menubar } from 'menubar';
 import * as registry from 'reentry-cli/src/registry.js';
-import { getProjectCards } from './ipc/projects.js';
+import { getProjectCards, getProjectDetail } from './ipc/projects.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -36,6 +36,8 @@ ipcMain.handle('remove-project', (event, name) => {
   registry.remove(name);
   return getProjectCards();
 });
+
+ipcMain.handle('get-project-detail', (event, projectPath) => getProjectDetail(projectPath));
 
 mb.on('ready', () => {
   console.log('sidedash is ready');

@@ -5,13 +5,15 @@
   "main": "src/main.js",
   "type": "module",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "electron": "^34.5.8"
+    "electron": "^34.5.8",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "menubar": "^9.5.2",
