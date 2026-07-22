@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, ipcMain, dialog, shell, Notification } from 'electron';
 import { menubar } from 'menubar';
-import * as registry from 'reentry-cli/src/registry.js';
+import * as registry from './lib/registry.js';
 import { getProjectCards, canAddProject } from './ipc/projects.js';
 import { runAction, isRunning, hasRunningActions, killAllRunning } from './actions/run.js';
 import { recordRun } from './actions/history.js';

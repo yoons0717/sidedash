@@ -16,7 +16,6 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "menubar": "^9.5.2",
-    "reentry-cli": "file:../reentry-cli"
+    "menubar": "^9.5.2"
   }
 }

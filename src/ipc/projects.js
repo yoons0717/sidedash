@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import * as registry from 'reentry-cli/src/registry.js';
-import { getLastCommit, getGitStatus, getGitHubUrl } from 'reentry-cli/src/scanner.js';
+import * as registry from '../lib/registry.js';
+import { getLastCommit, getGitStatus, getGitHubUrl } from '../lib/scanner.js';
 import { detectAction } from '../actions/detect.js';
 import { getLastRun } from '../actions/history.js';
 
