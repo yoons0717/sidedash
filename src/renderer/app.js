@@ -3,6 +3,25 @@ const ACTION_LABELS = {
   pdf: 'PDF 생성',
 };
 
+const runningPaths = new Set();
+let currentProjects = [];
+
+function setActionButtonState(actionBtn, project) {
+  const running = runningPaths.has(project.path);
+  actionBtn.disabled = running;
+  actionBtn.classList.toggle('card-action-running', running);
+  actionBtn.textContent = running ? '실행 중…' : ACTION_LABELS[project.action];
+}
+
+async function handleRunAction(project, actionBtn) {
+  if (runningPaths.has(project.path)) {
+    return;
+  }
+  runningPaths.add(project.path);
+  setActionButtonState(actionBtn, project);
+  await window.api.runAction(project.path);
+}
+
 function renderCard(project) {
   const card = document.createElement('div');
   card.className = 'card';
@@ -19,8 +38,12 @@ function renderCard(project) {
   if (project.action) {
     const actionBtn = document.createElement('button');
     actionBtn.className = 'card-action';
-    actionBtn.textContent = ACTION_LABELS[project.action];
-    actionBtn.addEventListener('click', (event) => event.stopPropagation());
+    actionBtn.dataset.path = project.path;
+    setActionButtonState(actionBtn, project);
+    actionBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      handleRunAction(project, actionBtn);
+    });
     header.appendChild(actionBtn);
   }
 
@@ -88,6 +111,7 @@ function renderProjects(projects) {
   const listEl = document.getElementById('project-list');
   const countEl = document.getElementById('project-count');
 
+  currentProjects = projects;
   countEl.textContent = String(projects.length);
   listEl.innerHTML = '';
   for (const project of projects) {
@@ -105,8 +129,18 @@ async function handleAdd() {
   renderProjects(projects);
 }
 
+function handleActionExited({ path }) {
+  runningPaths.delete(path);
+  const project = currentProjects.find((p) => p.path === path);
+  const actionBtn = document.querySelector(`.card-action[data-path="${CSS.escape(path)}"]`);
+  if (project && actionBtn) {
+    setActionButtonState(actionBtn, project);
+  }
+}
+
 async function init() {
   document.getElementById('add-project').addEventListener('click', handleAdd);
+  window.api.onActionExited(handleActionExited);
 
   const projects = await window.api.getProjectCards();
   renderProjects(projects);

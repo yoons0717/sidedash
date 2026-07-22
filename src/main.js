@@ -4,6 +4,8 @@ import { app, ipcMain, dialog } from 'electron';
 import { menubar } from 'menubar';
 import * as registry from 'reentry-cli/src/registry.js';
 import { getProjectCards, getProjectDetail } from './ipc/projects.js';
+import { runAction } from './actions/run.js';
+import { openLogWindow } from './logwindow.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -38,6 +40,27 @@ ipcMain.handle('remove-project', (event, name) => {
 });
 
 ipcMain.handle('get-project-detail', (event, projectPath) => getProjectDetail(projectPath));
+
+ipcMain.handle('run-action', (event, projectPath) => {
+  const cards = getProjectCards();
+  const project = cards.find((p) => p.path === projectPath);
+  if (!project || !project.action) {
+    return;
+  }
+
+  const logWindow = openLogWindow(project.name);
+
+  runAction(
+    { ...project, actionType: project.action },
+    cards,
+    {
+      onData: (chunk) => logWindow.appendData(chunk),
+      onExit: (code) => {
+        mb.window?.webContents.send('action-exited', { path: project.path, code });
+      },
+    }
+  );
+});
 
 mb.on('ready', () => {
   console.log('sidedash is ready');

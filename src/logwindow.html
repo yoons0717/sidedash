@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>실행 로그</title>
+    <style>
+      body {
+        margin: 0;
+        background: #1e1e1e;
+        color: #ddd;
+      }
+      #log {
+        margin: 0;
+        padding: 12px;
+        font-family: Menlo, Consolas, monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="log"></pre>
+    <script>
+      const { ipcRenderer } = require('electron');
+      const logEl = document.getElementById('log');
+
+      function appendText(text) {
+        logEl.appendChild(document.createTextNode(text));
+        window.scrollTo(0, document.body.scrollHeight);
+      }
+
+      ipcRenderer.on('log-data', (event, chunk) => {
+        appendText(chunk);
+      });
+    </script>
+  </body>
+</html>

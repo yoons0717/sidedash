@@ -5,4 +5,7 @@ contextBridge.exposeInMainWorld('api', {
   addProject: () => ipcRenderer.invoke('add-project'),
   removeProject: (name) => ipcRenderer.invoke('remove-project', name),
   getProjectDetail: (path) => ipcRenderer.invoke('get-project-detail', path),
+  runAction: (path) => ipcRenderer.invoke('run-action', path),
+  onActionExited: (callback) =>
+    ipcRenderer.on('action-exited', (event, payload) => callback(payload)),
 });
