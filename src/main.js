@@ -1,10 +1,11 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
 import { app, ipcMain, dialog, shell, Notification } from 'electron';
 import { menubar } from 'menubar';
 import * as registry from './lib/registry.js';
 import { getProjectCards, canAddProject } from './ipc/projects.js';
-import { runAction, isRunning, hasRunningActions, killAllRunning } from './actions/run.js';
+import { runAction, isRunning, hasRunningActions, killAllRunning, shellQuote } from './actions/run.js';
 import { recordRun } from './actions/history.js';
 import { getUncommittedFiles } from './actions/git.js';
 import { openLogWindow } from './logwindow.js';
@@ -63,6 +64,47 @@ ipcMain.handle('remove-project', (event, name) => {
 ipcMain.handle('open-external', (event, url) => shell.openExternal(url));
 
 ipcMain.handle('get-uncommitted-files', (event, projectPath) => getUncommittedFiles(projectPath));
+
+// Neither `open -a` nor a missing shell command produce a spawn 'error'
+// event on their own (the child process itself launches fine) — the failure
+// shows up as stderr + a non-zero exit code instead. Without listening for
+// both, a missing app/CLI fails completely silently (or, if 'error' really
+// does fire and nothing handles it, can crash the main process).
+function spawnAndReportErrors(label, command, args) {
+  const child = spawn(command, args);
+  let stderr = '';
+  child.stderr?.on('data', (chunk) => {
+    stderr += chunk;
+  });
+  child.on('error', (err) => {
+    dialog.showErrorBox(`${label}를 열 수 없습니다`, err.message);
+  });
+  child.on('exit', (code) => {
+    if (code !== 0) {
+      dialog.showErrorBox(`${label}를 열 수 없습니다`, stderr.trim() || `종료 코드 ${code}`);
+    }
+  });
+}
+
+// `open -a` resolves the app by name via Launch Services, so it works
+// regardless of whether the `code` shell command is installed.
+ipcMain.handle('open-in-vscode', (event, projectPath) => {
+  spawnAndReportErrors('VS Code', 'open', ['-a', 'Visual Studio Code', projectPath]);
+});
+
+// cmux's bin/ isn't on PATH via any shell profile or /etc/paths.d entry —
+// cmux injects it only into terminal sessions it spawns itself, so even the
+// login-shell trick (which works for nvm/homebrew PATH entries in ~/.zprofile)
+// can't find it from a plain Electron-spawned shell. Call the CLI inside the
+// app bundle directly instead of relying on `cmux` resolving via PATH.
+const CMUX_CLI = '/Applications/cmux.app/Contents/Resources/bin/cmux';
+
+// `cmux <path>` only creates the workspace over its control socket, it
+// doesn't raise the app — without `open -a cmux` after it, the workspace
+// opens invisibly behind whatever window already has focus.
+ipcMain.handle('open-in-cmux', (event, projectPath) => {
+  spawnAndReportErrors('cmux', '/bin/zsh', ['-lc', `${shellQuote(CMUX_CLI)} ${shellQuote(projectPath)} && open -a cmux`]);
+});
 
 ipcMain.handle('quit-app', async () => {
   if (hasRunningActions()) {

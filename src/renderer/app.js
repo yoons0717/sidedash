@@ -156,6 +156,53 @@ function buildTargetSelectPanel(project, card, actionBtn) {
   return panel;
 }
 
+// Monochrome (currentColor) so hover/opacity styling in CSS applies without
+// per-icon overrides.
+const LINK_ICONS = {
+  github:
+    '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>',
+  vscode:
+    '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4 1 8l4 4M11 4l4 4-4 4"/></svg>',
+};
+
+// Kept out of the header row entirely — with a 360px popup, the title has
+// no room left once these links compete with the action and remove buttons
+// for space (long names got truncated to a few characters). Icon-only
+// buttons (title attr covers the label) so the row stays compact.
+//
+// cmux isn't offered here (yet): its CLI refuses connections from anything
+// it didn't launch itself ("Access denied — only processes started inside
+// cmux can connect"), so sidedash can't drive it without the user first
+// setting up a socket password in cmux's own Settings. openInCmux is still
+// wired up in main.js/preload for whenever that gets sorted out.
+function buildLinksRow(project) {
+  const links = [];
+  if (project.githubUrl) {
+    links.push(['github', 'GitHub에서 열기', () => window.api.openExternal(project.githubUrl)]);
+  }
+  if (project.pathExists) {
+    links.push(['vscode', 'VS Code에서 열기', () => window.api.openInVscode(project.path)]);
+  }
+  if (links.length === 0) {
+    return null;
+  }
+
+  const row = document.createElement('div');
+  row.className = 'card-links';
+  for (const [icon, title, onClick] of links) {
+    const link = document.createElement('button');
+    link.className = 'card-link';
+    link.innerHTML = LINK_ICONS[icon];
+    link.title = title;
+    link.addEventListener('click', (event) => {
+      event.stopPropagation();
+      onClick();
+    });
+    row.appendChild(link);
+  }
+  return row;
+}
+
 function renderCard(project) {
   const card = document.createElement('div');
   card.className = 'card';
@@ -176,18 +223,6 @@ function renderCard(project) {
   title.className = 'card-title';
   title.textContent = project.name;
   header.appendChild(title);
-
-  if (project.githubUrl) {
-    const githubBtn = document.createElement('button');
-    githubBtn.className = 'card-github';
-    githubBtn.textContent = '🔗';
-    githubBtn.title = 'GitHub에서 열기';
-    githubBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      window.api.openExternal(project.githubUrl);
-    });
-    header.appendChild(githubBtn);
-  }
 
   let targetSelectPanel = null;
   let actionBtn = null;
@@ -220,6 +255,11 @@ function renderCard(project) {
   header.appendChild(removeBtn);
 
   body.appendChild(header);
+
+  const linksRow = buildLinksRow(project);
+  if (linksRow) {
+    body.appendChild(linksRow);
+  }
 
   const detail = document.createElement('div');
   detail.className = 'card-detail';

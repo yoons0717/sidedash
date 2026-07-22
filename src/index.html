@@ -183,19 +183,28 @@
         color: #9a9ab8;
         cursor: default;
       }
-      .card-github {
+      .card-links {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        margin-top: 4px;
+        margin-left: -6px;
+      }
+      .card-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
         border: none;
         background: none;
         cursor: pointer;
-        font-size: 12px;
-        padding: 6px;
+        color: #8a8aae;
+        padding: 5px;
         border-radius: 6px;
         line-height: 1;
-        opacity: 0.7;
-        transition: opacity 0.1s ease, background-color 0.1s ease;
+        transition: color 0.1s ease, background-color 0.1s ease;
       }
-      .card-github:hover {
-        opacity: 1;
+      .card-link:hover {
+        color: #d0d0e8;
         background: #2c2c46;
       }
       .card-remove {

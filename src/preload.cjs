@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('api', {
   removeProject: (name) => ipcRenderer.invoke('remove-project', name),
   runAction: (path, targetPaths) => ipcRenderer.invoke('run-action', path, targetPaths),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  openInVscode: (path) => ipcRenderer.invoke('open-in-vscode', path),
+  openInCmux: (path) => ipcRenderer.invoke('open-in-cmux', path),
   getUncommittedFiles: (path) => ipcRenderer.invoke('get-uncommitted-files', path),
   quitApp: () => ipcRenderer.invoke('quit-app'),
   onActionExited: (callback) =>
