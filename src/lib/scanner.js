@@ -34,8 +34,20 @@ export function getLastCommit(projectPath) {
 }
 
 export function getGitStatus(projectPath) {
+  // symbolic-ref fails whenever HEAD isn't on a branch (detached HEAD —
+  // mid-rebase, or a tag/commit checked out directly). That's unrelated to
+  // whether `status --porcelain` can run, so it gets its own try/catch —
+  // otherwise a detached-HEAD project silently lost its uncommitted-changes
+  // count too, since the original single try/catch bailed out on the first
+  // failure before ever reaching the status call.
+  let branch = null;
   try {
-    const branch = runGit(projectPath, ['symbolic-ref', '--short', 'HEAD']);
+    branch = runGit(projectPath, ['symbolic-ref', '--short', 'HEAD']);
+  } catch {
+    // Not on a branch — leave branch as null, status can still succeed.
+  }
+
+  try {
     const statusOutput = runGit(projectPath, ['status', '--porcelain']);
     const changedFileCount = statusOutput
       ? statusOutput.split('\n').filter((line) => line.length > 0).length
