@@ -13,6 +13,11 @@ app.dock.hide();
 
 const mb = menubar({
   index: `file://${path.join(__dirname, 'index.html')}`,
+  // menubar's default icon lookup is `<options.dir>/IconTemplate.png`, and
+  // options.dir defaults to app.getAppPath() (the project root) — not this
+  // src/ directory where the icon files actually live. Without this explicit
+  // path it silently falls back to menubar's own bundled default icon.
+  icon: path.join(__dirname, 'IconTemplate.png'),
   browserWindow: {
     width: 360,
     height: 560,
