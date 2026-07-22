@@ -22,10 +22,31 @@
         font-size: 12px;
         margin-top: 2px;
       }
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .add-btn,
+      .card-remove {
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-size: 14px;
+        color: #666;
+      }
     </style>
   </head>
   <body>
-    <div>내 프로젝트 (<span id="project-count">0</span>)</div>
+    <div class="header">
+      <div>내 프로젝트 (<span id="project-count">0</span>)</div>
+      <button id="add-project" class="add-btn">＋</button>
+    </div>
     <div id="project-list"></div>
     <script src="renderer/app.js"></script>
   </body>

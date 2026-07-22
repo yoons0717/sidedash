@@ -2,10 +2,21 @@ function renderCard(project) {
   const card = document.createElement('div');
   card.className = 'card';
 
+  const header = document.createElement('div');
+  header.className = 'card-header';
+
   const title = document.createElement('div');
   title.className = 'card-title';
   title.textContent = project.name;
-  card.appendChild(title);
+  header.appendChild(title);
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'card-remove';
+  removeBtn.textContent = '✕';
+  removeBtn.addEventListener('click', () => handleRemove(project.name));
+  header.appendChild(removeBtn);
+
+  card.appendChild(header);
 
   const detail = document.createElement('div');
   detail.className = 'card-detail';
@@ -22,8 +33,7 @@ function renderCard(project) {
   return card;
 }
 
-async function init() {
-  const projects = await window.api.getProjectCards();
+function renderProjects(projects) {
   const listEl = document.getElementById('project-list');
   const countEl = document.getElementById('project-count');
 
@@ -32,6 +42,23 @@ async function init() {
   for (const project of projects) {
     listEl.appendChild(renderCard(project));
   }
+}
+
+async function handleRemove(name) {
+  const projects = await window.api.removeProject(name);
+  renderProjects(projects);
+}
+
+async function handleAdd() {
+  const projects = await window.api.addProject();
+  renderProjects(projects);
+}
+
+async function init() {
+  document.getElementById('add-project').addEventListener('click', handleAdd);
+
+  const projects = await window.api.getProjectCards();
+  renderProjects(projects);
 }
 
 init();
