@@ -3,8 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { app, ipcMain, dialog } from 'electron';
 import { menubar } from 'menubar';
 import * as registry from 'reentry-cli/src/registry.js';
-import { getProjectCards, getProjectDetail } from './ipc/projects.js';
-import { runAction } from './actions/run.js';
+import { getProjectCards, getProjectDetail, canAddProject } from './ipc/projects.js';
+import { runAction, isRunning } from './actions/run.js';
 import { openLogWindow } from './logwindow.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -24,10 +24,20 @@ const mb = menubar({
 
 ipcMain.handle('get-project-cards', () => getProjectCards());
 
+const ADD_REJECTION_MESSAGES = {
+  'already-registered': '이미 등록된 프로젝트입니다.',
+  'name-collision': '같은 이름의 프로젝트가 이미 등록되어 있습니다. 폴더 이름이 겹치지 않게 해주세요.',
+};
+
 ipcMain.handle('add-project', async () => {
   const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
   if (!result.canceled && result.filePaths.length > 0) {
     const projectPath = result.filePaths[0];
+    const check = canAddProject(projectPath, registry.getAll());
+    if (!check.ok) {
+      await dialog.showMessageBox({ type: 'warning', message: ADD_REJECTION_MESSAGES[check.reason] });
+      return getProjectCards();
+    }
     const name = path.basename(projectPath);
     registry.add(name, projectPath);
   }
@@ -49,6 +59,13 @@ ipcMain.handle('run-action', (event, projectPath) => {
   const cards = getProjectCards();
   const project = cards.find((p) => p.path === projectPath);
   if (!project || !project.action) {
+    return;
+  }
+
+  // Check the backend-authoritative guard *before* opening the log window —
+  // otherwise a suppressed duplicate run (e.g. renderer state lost after a
+  // popup reload) opens a window that never receives data or an exit signal.
+  if (isRunning(project.path)) {
     return;
   }
 

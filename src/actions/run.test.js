@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
-import { runAction, runningProjects, shellQuote } from './run.js';
+import { createUtf8Decoder, isRunning, runAction, runningProjects, shellQuote } from './run.js';
 
 describe('shellQuote', () => {
   it('wraps a plain string in single quotes', () => {
@@ -49,5 +49,39 @@ describe('runAction', () => {
     expect(exitCode).toBeNull();
     expect(runningProjects.has(project.path)).toBe(false);
     expect(dataChunks.join('')).toContain('명령을 실행할 수 없습니다');
+  });
+
+  it('reports isRunning(path) as true while the guard holds the path, false once cleared', async () => {
+    const project = { path: '/no/such/directory/for-sidedash-isrunning-test', actionType: 'pdf' };
+
+    expect(isRunning(project.path)).toBe(false);
+
+    await new Promise((resolve) => {
+      runAction(project, [], { onExit: () => resolve() });
+      // The guard is added synchronously before spawn() is even attempted,
+      // so it must already be true in the same tick runAction was called.
+      expect(isRunning(project.path)).toBe(true);
+    });
+
+    expect(isRunning(project.path)).toBe(false);
+  });
+});
+
+describe('createUtf8Decoder', () => {
+  it('correctly stitches a multi-byte UTF-8 character split across two chunks', () => {
+    const full = Buffer.from('한글 테스트 완료\n', 'utf8');
+    // '한' is 3 bytes (0xEC 0x95 0x9C at this offset in the full buffer);
+    // splitting after 1 byte guarantees the cut lands mid-character.
+    const chunk1 = full.subarray(0, 1);
+    const chunk2 = full.subarray(1);
+
+    // Sanity check: naively decoding each half independently is where the bug
+    // lives today (chunk.toString() per chunk) — confirms the split is real.
+    expect(chunk1.toString('utf8') + chunk2.toString('utf8')).not.toBe(full.toString('utf8'));
+
+    const decode = createUtf8Decoder();
+    const result = decode(chunk1) + decode(chunk2);
+
+    expect(result).toBe('한글 테스트 완료\n');
   });
 });

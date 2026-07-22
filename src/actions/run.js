@@ -1,10 +1,20 @@
 import { spawn } from 'node:child_process';
+import { StringDecoder } from 'node:string_decoder';
 
 export function shellQuote(str) {
   return `'${str.replace(/'/g, `'\\''`)}'`;
 }
 
+export function createUtf8Decoder() {
+  const decoder = new StringDecoder('utf8');
+  return (chunk) => decoder.write(chunk);
+}
+
 const runningProjects = new Set();
+
+export function isRunning(projectPath) {
+  return runningProjects.has(projectPath);
+}
 
 export function runAction(project, allProjects, { onData, onExit } = {}) {
   if (runningProjects.has(project.path)) {
@@ -26,8 +36,11 @@ export function runAction(project, allProjects, { onData, onExit } = {}) {
 
   const child = spawn('/bin/zsh', ['-lc', command], { cwd: project.path });
 
-  child.stdout.on('data', (chunk) => onData?.(chunk.toString()));
-  child.stderr.on('data', (chunk) => onData?.(chunk.toString()));
+  const decodeStdout = createUtf8Decoder();
+  const decodeStderr = createUtf8Decoder();
+
+  child.stdout.on('data', (chunk) => onData?.(decodeStdout(chunk)));
+  child.stderr.on('data', (chunk) => onData?.(decodeStderr(chunk)));
 
   child.on('exit', (code) => {
     runningProjects.delete(project.path);
