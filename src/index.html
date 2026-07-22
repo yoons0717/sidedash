@@ -118,25 +118,23 @@
         color: #e05858;
       }
       .card-action {
-        box-sizing: border-box;
-        border: 1.5px solid #5b5be0;
-        background: transparent;
-        color: #9b9bf0;
+        border: none;
+        background: #5b5be0;
+        color: #fff;
         cursor: pointer;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 600;
-        padding: 8px 14px;
-        border-radius: 8px;
+        padding: 5px 10px;
+        border-radius: 7px;
         white-space: nowrap;
-        transition: background-color 0.1s ease;
+        transition: filter 0.1s ease;
       }
       .card-action:hover:not(.card-action-running) {
-        background: rgba(91, 91, 224, 0.18);
+        filter: brightness(1.12);
       }
       .card-action-running {
-        border-color: #3a3a5c;
-        background: transparent;
-        color: #6f6f8a;
+        background: #3a3a5c;
+        color: #9a9ab8;
         cursor: default;
       }
       .card-remove {
