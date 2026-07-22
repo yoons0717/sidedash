@@ -48,15 +48,17 @@ ipcMain.handle('run-action', (event, projectPath) => {
     return;
   }
 
-  const logWindow = openLogWindow(project.name);
+  const projectWithType = { ...project, actionType: project.action };
+  const logWindow = openLogWindow(project.name, projectWithType);
 
   runAction(
-    { ...project, actionType: project.action },
+    projectWithType,
     cards,
     {
       onData: (chunk) => logWindow.appendData(chunk),
       onExit: (code) => {
         mb.window?.webContents.send('action-exited', { path: project.path, code });
+        logWindow.finish(code);
       },
     }
   );

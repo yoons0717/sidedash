@@ -4,7 +4,7 @@ import { BrowserWindow } from 'electron';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export function openLogWindow(title) {
+export function openLogWindow(title, project) {
   const win = new BrowserWindow({
     width: 600,
     height: 400,
@@ -41,5 +41,7 @@ export function openLogWindow(title) {
 
   return {
     appendData: (chunk) => send('log-data', chunk),
+    finish: (code) =>
+      send('log-exit', { code, path: project.path, actionType: project.actionType }),
   };
 }
