@@ -1,13 +1,15 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, ipcMain, dialog } from 'electron';
+import { app, ipcMain, dialog, Notification } from 'electron';
 import { menubar } from 'menubar';
 import * as registry from 'reentry-cli/src/registry.js';
 import { getProjectCards, getProjectDetail, canAddProject } from './ipc/projects.js';
 import { runAction, isRunning, hasRunningActions, killAllRunning } from './actions/run.js';
+import { recordRun } from './actions/history.js';
 import { openLogWindow } from './logwindow.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const HISTORY_FILE = path.join(app.getPath('userData'), 'last-run.json');
 
 app.dock.hide();
 
@@ -27,7 +29,7 @@ const mb = menubar({
   },
 });
 
-ipcMain.handle('get-project-cards', () => getProjectCards());
+ipcMain.handle('get-project-cards', () => getProjectCards(HISTORY_FILE));
 
 const ADD_REJECTION_MESSAGES = {
   'already-registered': '이미 등록된 프로젝트입니다.',
@@ -44,17 +46,17 @@ ipcMain.handle('add-project', async () => {
     const check = canAddProject(projectPath, registry.getAll());
     if (!check.ok) {
       await dialog.showMessageBox(mb.window, { type: 'warning', message: ADD_REJECTION_MESSAGES[check.reason] });
-      return getProjectCards();
+      return getProjectCards(HISTORY_FILE);
     }
     const name = path.basename(projectPath);
     registry.add(name, projectPath);
   }
-  return getProjectCards();
+  return getProjectCards(HISTORY_FILE);
 });
 
 ipcMain.handle('remove-project', (event, name) => {
   registry.remove(name);
-  return getProjectCards();
+  return getProjectCards(HISTORY_FILE);
 });
 
 ipcMain.handle('get-project-detail', (event, projectPath) => getProjectDetail(projectPath));
@@ -76,8 +78,13 @@ ipcMain.handle('quit-app', async () => {
   app.quit();
 });
 
+const ACTION_LABELS = {
+  pipeline: '파이프라인 실행',
+  pdf: 'PDF 생성',
+};
+
 ipcMain.handle('run-action', (event, projectPath, targetPaths) => {
-  const cards = getProjectCards();
+  const cards = getProjectCards(HISTORY_FILE);
   const project = cards.find((p) => p.path === projectPath);
   if (!project || !project.action) {
     return;
@@ -101,6 +108,19 @@ ipcMain.handle('run-action', (event, projectPath, targetPaths) => {
       onExit: (code) => {
         mb.window?.webContents.send('action-exited', { path: project.path, code });
         logWindow.finish(code);
+
+        if (code === 0) {
+          recordRun(HISTORY_FILE, project.path);
+        }
+
+        const actionLabel = ACTION_LABELS[project.action];
+        const body =
+          code === 0 ? `${actionLabel} 완료`
+          : code === null ? `${actionLabel} 실패 (프로세스를 시작하지 못함)`
+          : `${actionLabel} 실패 (종료 코드 ${code})`;
+        const notification = new Notification({ title: project.name, body });
+        notification.on('click', () => logWindow.focus());
+        notification.show();
       },
     }
   );

@@ -12,6 +12,17 @@ const DEFAULT_ICON = { text: '📁', className: '' };
 const runningPaths = new Set();
 let currentProjects = [];
 
+function formatRelativeTime(isoString, now = new Date()) {
+  const diffMs = now.getTime() - new Date(isoString).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return '방금 전';
+  if (minutes < 60) return `${minutes}분 전`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}시간 전`;
+  const days = Math.floor(hours / 24);
+  return `${days}일 전`;
+}
+
 function setActionButtonState(actionBtn, project) {
   const running = runningPaths.has(project.path);
   actionBtn.disabled = running;
@@ -171,6 +182,13 @@ function renderCard(project) {
   }
   body.appendChild(detail);
 
+  if (project.action && project.lastRun) {
+    const lastRunEl = document.createElement('div');
+    lastRunEl.className = 'card-last-run';
+    lastRunEl.textContent = `마지막 실행: ${formatRelativeTime(project.lastRun)}`;
+    body.appendChild(lastRunEl);
+  }
+
   const expanded = document.createElement('div');
   expanded.className = 'card-expanded';
   expanded.style.display = 'none';
@@ -244,13 +262,13 @@ async function handleAdd() {
   renderProjects(projects);
 }
 
-function handleActionExited({ path }) {
+async function handleActionExited({ path }) {
   runningPaths.delete(path);
-  const project = currentProjects.find((p) => p.path === path);
-  const actionBtn = document.querySelector(`.card-action[data-path="${CSS.escape(path)}"]`);
-  if (project && actionBtn) {
-    setActionButtonState(actionBtn, project);
-  }
+  // Re-fetch rather than just resetting the button: a successful run updates
+  // lastRun on disk, and the card needs fresh data to show it without
+  // waiting for the next app restart.
+  const projects = await window.api.getProjectCards();
+  renderProjects(projects);
 }
 
 async function init() {

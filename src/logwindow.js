@@ -9,11 +9,17 @@ export function openLogWindow(title, project) {
     width: 600,
     height: 400,
     title,
+    show: false,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
     },
   });
+
+  // showInactive() (not the default auto-show) keeps focus on the menubar
+  // popup — a normal show() would steal focus and trigger menubar's
+  // hide-on-blur, closing the popup the moment the log window appears.
+  win.once('ready-to-show', () => win.showInactive());
 
   win.loadFile(path.join(__dirname, 'logwindow.html'));
 
@@ -43,5 +49,11 @@ export function openLogWindow(title, project) {
     appendData: (chunk) => send('log-data', chunk),
     finish: (code) =>
       send('log-exit', { code, path: project.path, actionType: project.actionType }),
+    focus: () => {
+      if (win.isDestroyed()) return;
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    },
   };
 }

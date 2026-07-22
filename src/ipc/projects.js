@@ -3,6 +3,7 @@ import path from 'node:path';
 import * as registry from 'reentry-cli/src/registry.js';
 import { getLastCommit, getGitStatus, getPackageScripts, findTodos } from 'reentry-cli/src/scanner.js';
 import { detectAction } from '../actions/detect.js';
+import { getLastRun } from '../actions/history.js';
 
 // registry.add() has no dedup and registry.remove() filters by name, so
 // without this check a duplicate path (or a different path sharing a
@@ -21,11 +22,21 @@ export function canAddProject(newPath, existingProjects) {
   return { ok: true };
 }
 
-export function getProjectCards() {
+export function getProjectCards(historyFilePath) {
   return registry.getAll().map(({ name, path }) => {
+    const lastRun = historyFilePath ? getLastRun(historyFilePath, path) : null;
     const pathExists = fs.existsSync(path);
     if (!pathExists) {
-      return { name, path, branch: null, lastCommit: null, hasUncommittedChanges: false, pathExists, action: null };
+      return {
+        name,
+        path,
+        branch: null,
+        lastCommit: null,
+        hasUncommittedChanges: false,
+        pathExists,
+        action: null,
+        lastRun,
+      };
     }
 
     const gitStatus = getGitStatus(path);
@@ -39,6 +50,7 @@ export function getProjectCards() {
       hasUncommittedChanges: gitStatus?.hasUncommittedChanges ?? false,
       pathExists,
       action: detectAction(path),
+      lastRun,
     };
   });
 }
