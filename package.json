@@ -1,0 +1,19 @@
+{
+  "name": "sidedash",
+  "version": "1.0.0",
+  "description": "Personal macOS menubar dashboard for running side-project CLI tools",
+  "main": "src/main.js",
+  "type": "module",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^34.5.8"
+  },
+  "dependencies": {
+    "menubar": "^9.5.2"
+  }
+}
