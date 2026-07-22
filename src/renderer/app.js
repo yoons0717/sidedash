@@ -43,6 +43,10 @@ function buildTargetSelectPanel(project, card, actionBtn) {
   const panel = document.createElement('div');
   panel.className = 'target-select';
   panel.style.display = 'none';
+  // Without this, clicking a checkbox (or anywhere else in the panel) would
+  // bubble up to the card's own click-to-expand handler and collapse the
+  // whole card mid-selection.
+  panel.addEventListener('click', (event) => event.stopPropagation());
 
   const otherProjects = currentProjects.filter((p) => p.path !== project.path);
   const checkboxes = [];
@@ -99,6 +103,11 @@ function buildTargetSelectPanel(project, card, actionBtn) {
 function renderCard(project) {
   const card = document.createElement('div');
   card.className = 'card';
+  // The action/remove buttons and the target-select panel's own buttons all
+  // stopPropagation(), so attaching the expand toggle here (rather than just
+  // the header row) makes the whole card clickable without those controls
+  // accidentally triggering it too.
+  card.addEventListener('click', () => toggleExpanded(card, project));
 
   const icon = ACTION_ICONS[project.action] ?? DEFAULT_ICON;
   const iconEl = document.createElement('div');
@@ -111,7 +120,6 @@ function renderCard(project) {
 
   const header = document.createElement('div');
   header.className = 'card-header';
-  header.addEventListener('click', () => toggleExpanded(card, project));
 
   const title = document.createElement('div');
   title.className = 'card-title';
