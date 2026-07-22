@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('api', {
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   openInVscode: (path) => ipcRenderer.invoke('open-in-vscode', path),
   openInCmux: (path) => ipcRenderer.invoke('open-in-cmux', path),
+  openInFinder: (path) => ipcRenderer.invoke('open-in-finder', path),
   getUncommittedFiles: (path) => ipcRenderer.invoke('get-uncommitted-files', path),
   quitApp: () => ipcRenderer.invoke('quit-app'),
   onActionExited: (callback) =>

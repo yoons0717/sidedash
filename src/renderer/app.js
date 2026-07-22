@@ -163,33 +163,31 @@ const LINK_ICONS = {
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>',
   vscode:
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4 1 8l4 4M11 4l4 4-4 4"/></svg>',
+  finder:
+    '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M1.5 3A1.5 1.5 0 013 1.5h3.5L8 3.5h4.5A1.5 1.5 0 0114 5v7.5A1.5 1.5 0 0112.5 14h-9A1.5 1.5 0 012 12.5V3z"/></svg>',
 };
 
-// Kept out of the header row entirely — with a 360px popup, the title has
-// no room left once these links compete with the action and remove buttons
-// for space (long names got truncated to a few characters). Icon-only
-// buttons (title attr covers the label) so the row stays compact.
+// Rendered as their own row below the title (see renderCard) rather than
+// inline in the header — with icons *and* an action button both competing
+// for header space, longer project names got truncated again even after
+// switching from text labels to icons.
 //
 // cmux isn't offered here (yet): its CLI refuses connections from anything
 // it didn't launch itself ("Access denied — only processes started inside
 // cmux can connect"), so sidedash can't drive it without the user first
 // setting up a socket password in cmux's own Settings. openInCmux is still
 // wired up in main.js/preload for whenever that gets sorted out.
-function buildLinksRow(project) {
+function buildLinkButtons(project) {
   const links = [];
   if (project.githubUrl) {
     links.push(['github', 'GitHub에서 열기', () => window.api.openExternal(project.githubUrl)]);
   }
   if (project.pathExists) {
     links.push(['vscode', 'VS Code에서 열기', () => window.api.openInVscode(project.path)]);
-  }
-  if (links.length === 0) {
-    return null;
+    links.push(['finder', 'Finder에서 열기', () => window.api.openInFinder(project.path)]);
   }
 
-  const row = document.createElement('div');
-  row.className = 'card-links';
-  for (const [icon, title, onClick] of links) {
+  return links.map(([icon, title, onClick]) => {
     const link = document.createElement('button');
     link.className = 'card-link';
     link.innerHTML = LINK_ICONS[icon];
@@ -198,9 +196,8 @@ function buildLinksRow(project) {
       event.stopPropagation();
       onClick();
     });
-    row.appendChild(link);
-  }
-  return row;
+    return link;
+  });
 }
 
 function renderCard(project) {
@@ -256,8 +253,13 @@ function renderCard(project) {
 
   body.appendChild(header);
 
-  const linksRow = buildLinksRow(project);
-  if (linksRow) {
+  const linkButtons = buildLinkButtons(project);
+  if (linkButtons.length > 0) {
+    const linksRow = document.createElement('div');
+    linksRow.className = 'card-links';
+    for (const link of linkButtons) {
+      linksRow.appendChild(link);
+    }
     body.appendChild(linksRow);
   }
 
@@ -362,6 +364,16 @@ async function init() {
   document.getElementById('sort-recent').addEventListener('click', () => setSortMode('recent'));
   document.getElementById('sort-name').addEventListener('click', () => setSortMode('name'));
   window.api.onActionExited(handleActionExited);
+
+  // menubar keeps this window's page loaded and just shows/hides it rather
+  // than reloading — without this, branch/commit/dirty-file status stays
+  // frozen at whatever it was when the app launched, until the next action
+  // happens to run and refresh it as a side effect.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      window.api.getProjectCards().then(renderProjects);
+    }
+  });
 
   const projects = await window.api.getProjectCards();
   renderProjects(projects);

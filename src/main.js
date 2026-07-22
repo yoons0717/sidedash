@@ -63,6 +63,15 @@ ipcMain.handle('remove-project', (event, name) => {
 
 ipcMain.handle('open-external', (event, url) => shell.openExternal(url));
 
+// shell.openPath resolves with an error string on failure (not a rejection),
+// so a bad path fails silently unless that string is checked.
+ipcMain.handle('open-in-finder', async (event, projectPath) => {
+  const error = await shell.openPath(projectPath);
+  if (error) {
+    dialog.showErrorBox('Finder에서 열 수 없습니다', error);
+  }
+});
+
 ipcMain.handle('get-uncommitted-files', (event, projectPath) => getUncommittedFiles(projectPath));
 
 // Neither `open -a` nor a missing shell command produce a spawn 'error'
