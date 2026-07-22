@@ -140,6 +140,7 @@ function handleActionExited({ path }) {
 
 async function init() {
   document.getElementById('add-project').addEventListener('click', handleAdd);
+  document.getElementById('quit-app').addEventListener('click', () => window.api.quitApp());
   window.api.onActionExited(handleActionExited);
 
   const projects = await window.api.getProjectCards();

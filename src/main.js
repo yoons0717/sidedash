@@ -41,6 +41,10 @@ ipcMain.handle('remove-project', (event, name) => {
 
 ipcMain.handle('get-project-detail', (event, projectPath) => getProjectDetail(projectPath));
 
+ipcMain.handle('quit-app', () => {
+  app.quit();
+});
+
 ipcMain.handle('run-action', (event, projectPath) => {
   const cards = getProjectCards();
   const project = cards.find((p) => p.path === projectPath);
