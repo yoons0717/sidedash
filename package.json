@@ -17,6 +17,6 @@
   },
   "dependencies": {
     "menubar": "^9.5.2",
-    "reentry-cli": "file:/Users/yoonmigoo/Desktop/myProject/reentry-cli"
+    "reentry-cli": "file:../reentry-cli"
   }
 }
