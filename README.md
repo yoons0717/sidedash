@@ -2,6 +2,7 @@
 
 개인 사이드 프로젝트용 CLI 도구들을 매번 터미널에서 명령어를 기억해 실행하는 대신,
 macOS 메뉴바에서 버튼 클릭으로 실행할 수 있게 해주는 개인용 Electron 대시보드입니다.
+TypeScript(strict) + electron-vite로 작성되어 있습니다.
 
 배포를 목표로 하지 않는 개인 전용 도구로, 코드사이닝/노터라이제이션/자동 업데이트/App Store
 배포는 스코프에서 제외되어 있습니다.
@@ -42,11 +43,11 @@ macOS 메뉴바에서 버튼 클릭으로 실행할 수 있게 해주는 개인�
 
 ## 데이터 레이어
 
-프로젝트 레지스트리는 `src/lib/registry.js`(등록/조회/삭제)와 `src/lib/scanner.js`(git 브랜치/
-최근 커밋/미커밋 변경 여부/GitHub URL)가 담당하며, `~/.pj/registry.json`에 저장합니다. 원래
-reentry-cli라는 별도 CLI 도구의 로직을 재사용하던 부분인데, sidedash를 독립적으로 설치·실행할
-수 있도록 필요한 함수만 이 저장소 안으로 가져왔습니다 — 같은 파일 포맷을 그대로 쓰기 때문에
-reentry-cli의 `pj` 명령어와 여전히 레지스트리를 공유할 수 있습니다.
+프로젝트 레지스트리는 `src/main/lib/registry.ts`(등록/조회/삭제)와 `src/main/lib/scanner.ts`
+(git 브랜치/최근 커밋/미커밋 변경 여부/GitHub URL)가 담당하며, `~/.pj/registry.json`에
+저장합니다. 원래 reentry-cli라는 별도 CLI 도구의 로직을 재사용하던 부분인데, sidedash를
+독립적으로 설치·실행할 수 있도록 필요한 함수만 이 저장소 안으로 가져왔습니다 — 같은 파일
+포맷을 그대로 쓰기 때문에 reentry-cli의 `pj` 명령어와 여전히 레지스트리를 공유할 수 있습니다.
 
 ## 요구 사항
 
@@ -59,6 +60,9 @@ reentry-cli의 `pj` 명령어와 여전히 레지스트리를 공유할 수 있�
 npm install
 npm start
 ```
+
+`npm start`는 `electron-vite dev`를 실행합니다 — 렌더러(팝업/로그 창) 코드를 고치면
+핫 리로드로 바로 반영되고, main/preload 코드를 고치면 앱이 자동 재시작됩니다.
 
 ## 앱으로 패키징
 
@@ -78,31 +82,42 @@ Mac을 재부팅해도 다시 켤 필요가 없습니다 (등록된 경로는 `�
 ## 테스트
 
 ```bash
-npm test
+npm test        # vitest 유닛 테스트
+npm run typecheck  # tsc -b --noEmit
 ```
 
 순수 로직(액션 감지, 실행 커맨드 조립 등)은 vitest 유닛 테스트로 커버되어 있습니다.
 Electron UI(트레이 팝업, 로그 창)는 자동화 테스트 없이 직접 실행해 수동으로 확인합니다.
+TypeScript strict 모드로 작성되어 있어 IPC 페이로드/데이터 레이어 타입은 컴파일 단계에서
+체크되지만, 채널 이름 오타나 실제 IPC 왕복 자체는 타입 체크 대상이 아닙니다.
 
 ## 프로젝트 구조
 
 ```
 src/
-├── main.js              # Electron 메인 프로세스, 메뉴바/IPC 설정
-├── preload.cjs          # 렌더러 프리로드 스크립트
-├── index.html           # 트레이 팝업 UI
-├── logwindow.html/.js   # 액션 실행 로그 창
-├── renderer/app.js      # 팝업 렌더러 로직
-├── actions/
-│   ├── detect.js        # run.sh / pdf 스크립트 존재 여부로 액션 타입 감지
-│   ├── run.js           # spawn으로 액션 실행(detached), 실시간 로그 스트리밍, 프로세스 트리 정리
-│   ├── git.js           # git status --porcelain 파싱 (미커밋 파일 목록)
-│   └── history.js       # 마지막 실행 시각 기록/조회 (userData/last-run.json)
-├── ipc/
-│   └── projects.js      # 프로젝트 카드 조회(git 상태/최근 실행/GitHub URL), 중복 등록 방지
-└── lib/
-    ├── registry.js      # 프로젝트 등록/조회/삭제 (~/.pj/registry.json)
-    └── scanner.js       # git 브랜치/커밋/GitHub URL, package.json scripts 조회
+├── main/
+│   ├── index.ts          # Electron 메인 프로세스, 메뉴바/IPC 설정
+│   ├── logwindow.ts       # 로그 창 BrowserWindow 생성/관리
+│   ├── actions/
+│   │   ├── detect.ts      # run.sh / pdf 스크립트 존재 여부로 액션 타입 감지
+│   │   ├── run.ts         # spawn으로 액션 실행(detached), 실시간 로그 스트리밍, 프로세스 트리 정리
+│   │   ├── git.ts         # git status --porcelain 파싱 (미커밋 파일 목록)
+│   │   └── history.ts     # 마지막 실행 시각 기록/조회 (userData/last-run.json)
+│   ├── ipc/
+│   │   └── projects.ts    # 프로젝트 카드 조회(git 상태/최근 실행/GitHub URL), 중복 등록 방지
+│   └── lib/
+│       ├── registry.ts    # 프로젝트 등록/조회/삭제 (~/.pj/registry.json)
+│       └── scanner.ts     # git 브랜치/커밋/GitHub URL, package.json scripts 조회
+├── preload/
+│   ├── index.ts           # 팝업 창 프리로드 (contextBridge로 window.api 노출)
+│   └── logwindow.ts        # 로그 창 프리로드 (contextBridge로 window.logApi 노출)
+├── renderer/
+│   ├── index.html / src/app.ts        # 트레이 팝업 UI
+│   └── logwindow.html / src/logwindow.ts  # 액션 실행 로그 창
+└── shared/types.ts        # main/preload/renderer가 공유하는 타입 정의
+
+resources/       # 트레이 아이콘 등 런타임에 필요한 정적 파일
+electron.vite.config.ts   # main/preload/renderer 3개 빌드 타겟 설정
 ```
 
 ## 스코프 밖
