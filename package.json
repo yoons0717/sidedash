@@ -6,12 +6,14 @@
   "type": "module",
   "scripts": {
     "start": "electron .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "package": "electron-packager . sidedash --platform=darwin --out=dist --overwrite --prune"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@electron/packager": "^20.0.4",
     "electron": "^34.5.8",
     "vitest": "^4.1.10"
   },

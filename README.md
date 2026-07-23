@@ -60,6 +60,18 @@ npm install
 npm start
 ```
 
+## 앱으로 패키징
+
+매번 터미널에서 `npm start`를 치는 대신 더블클릭으로 실행하고 싶으면:
+
+```bash
+npm run package
+```
+
+`dist/sidedash-darwin-arm64/sidedash.app`이 생성됩니다. Applications 폴더로 옮기거나
+Dock에 고정해 사용하세요. 코드사이닝/노터라이제이션이 안 되어 있어 첫 실행 시 macOS가
+"확인되지 않은 개발자" 경고를 띄우는데, Finder에서 우클릭 후 "열기"를 선택하면 됩니다.
+
 ## 테스트
 
 ```bash
