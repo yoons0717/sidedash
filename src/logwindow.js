@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export function openLogWindow(title, project) {
   const win = new BrowserWindow({
     width: 600,
-    height: 400,
+    height: 320,
     title,
     show: false,
     webPreferences: {
