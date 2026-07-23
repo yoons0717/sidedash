@@ -4,9 +4,6 @@
 macOS 메뉴바에서 버튼 클릭으로 실행할 수 있게 해주는 개인용 Electron 대시보드입니다.
 TypeScript(strict) + electron-vite로 작성되어 있습니다.
 
-배포를 목표로 하지 않는 개인 전용 도구로, 코드사이닝/노터라이제이션/자동 업데이트/App Store
-배포는 스코프에서 제외되어 있습니다.
-
 ![프로젝트 목록 팝업](docs/screenshots/popup.png)
 
 ## 왜 만들었나
@@ -33,6 +30,9 @@ TypeScript(strict) + electron-vite로 작성되어 있습니다.
   - `run.sh`가 있으면 "파이프라인 실행" 버튼 (예: debrief) — 누르면 다른 등록된
     프로젝트를 대상으로 체크할 수 있는 패널이 열리고, 체크한 프로젝트의 경로가
     `run.sh` 인자로 전달됩니다. 실제로 실행될 명령을 실시간으로 미리보기로 보여줍니다
+
+    ![대상 프로젝트 선택 패널](docs/screenshots/target-select.png)
+
   - `package.json`의 `scripts.pdf`가 있으면 "PDF 생성" 버튼 (예: resume-ym)
 - 액션 실행 시 별도 로그 창을 열어 stdout/stderr를 실시간 스트리밍
 
