@@ -4,3 +4,4 @@ dist/
 out/
 *.tsbuildinfo
 .DS_Store
+docs/retrospective.md
