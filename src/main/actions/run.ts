@@ -1,22 +1,33 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
+import type { ActionType } from '../../shared/types';
 
-export function shellQuote(str) {
+export interface RunnableProject {
+  path: string;
+  actionType: ActionType;
+}
+
+export interface RunActionCallbacks {
+  onData?: (chunk: string) => void;
+  onExit?: (code: number | null) => void;
+}
+
+export function shellQuote(str: string): string {
   return `'${str.replace(/'/g, `'\\''`)}'`;
 }
 
-export function createUtf8Decoder() {
+export function createUtf8Decoder(): (chunk: Buffer) => string {
   const decoder = new StringDecoder('utf8');
   return (chunk) => decoder.write(chunk);
 }
 
-const runningProjects = new Map(); // project.path -> ChildProcess
+const runningProjects = new Map<string, ChildProcess>(); // project.path -> ChildProcess
 
-export function isRunning(projectPath) {
+export function isRunning(projectPath: string): boolean {
   return runningProjects.has(projectPath);
 }
 
-export function hasRunningActions() {
+export function hasRunningActions(): boolean {
   return runningProjects.size > 0;
 }
 
@@ -25,22 +36,26 @@ export function hasRunningActions() {
 // the immediate spawned shell. Requires runAction to spawn with
 // `detached: true`, which makes the child the leader of its own process
 // group; signalling the negative pid targets that entire group.
-export function killAllRunning() {
+export function killAllRunning(): void {
   for (const child of runningProjects.values()) {
     try {
-      process.kill(-child.pid, 'SIGTERM');
+      process.kill(-child.pid!, 'SIGTERM');
     } catch {
       // Process group may already be gone — nothing left to kill.
     }
   }
 }
 
-export function runAction(project, targetPaths, { onData, onExit } = {}) {
+export function runAction(
+  project: RunnableProject,
+  targetPaths: string[],
+  { onData, onExit }: RunActionCallbacks = {}
+): void {
   if (runningProjects.has(project.path)) {
     return;
   }
 
-  let command;
+  let command: string;
   if (project.actionType === 'pipeline') {
     const quotedPaths = targetPaths.map(shellQuote);
     command = './run.sh ' + quotedPaths.join(' ');
@@ -56,8 +71,8 @@ export function runAction(project, targetPaths, { onData, onExit } = {}) {
   const decodeStdout = createUtf8Decoder();
   const decodeStderr = createUtf8Decoder();
 
-  child.stdout.on('data', (chunk) => onData?.(decodeStdout(chunk)));
-  child.stderr.on('data', (chunk) => onData?.(decodeStderr(chunk)));
+  child.stdout!.on('data', (chunk) => onData?.(decodeStdout(chunk)));
+  child.stderr!.on('data', (chunk) => onData?.(decodeStderr(chunk)));
 
   child.on('exit', (code) => {
     runningProjects.delete(project.path);

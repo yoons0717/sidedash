@@ -3,14 +3,14 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { getGitStatus } from './scanner.js';
+import { getGitStatus } from './scanner';
 
-function git(dir, args) {
+function git(dir: string, args: string[]): void {
   execFileSync('git', ['-C', dir, ...args], { encoding: 'utf-8' });
 }
 
 describe('getGitStatus', () => {
-  let dir;
+  let dir: string | undefined;
 
   afterEach(() => {
     if (dir) {
@@ -19,7 +19,7 @@ describe('getGitStatus', () => {
     }
   });
 
-  function setupRepo() {
+  function setupRepo(): void {
     dir = mkdtempSync(path.join(tmpdir(), 'sidedash-scanner-'));
     git(dir, ['init', '-q']);
     git(dir, ['config', 'user.email', 'test@example.com']);
@@ -28,11 +28,11 @@ describe('getGitStatus', () => {
 
   it('reports branch and clean status on a normal branch', () => {
     setupRepo();
-    writeFileSync(path.join(dir, 'a.txt'), 'hello');
-    git(dir, ['add', '-A']);
-    git(dir, ['commit', '-q', '-m', 'init']);
+    writeFileSync(path.join(dir!, 'a.txt'), 'hello');
+    git(dir!, ['add', '-A']);
+    git(dir!, ['commit', '-q', '-m', 'init']);
 
-    expect(getGitStatus(dir)).toEqual({
+    expect(getGitStatus(dir!)).toEqual({
       branch: 'main',
       hasUncommittedChanges: false,
       changedFileCount: 0,
@@ -41,20 +41,20 @@ describe('getGitStatus', () => {
 
   it('still reports uncommitted changes when HEAD is detached', () => {
     setupRepo();
-    writeFileSync(path.join(dir, 'a.txt'), 'hello');
-    git(dir, ['add', '-A']);
-    git(dir, ['commit', '-q', '-m', 'first']);
-    writeFileSync(path.join(dir, 'a.txt'), 'changed');
-    git(dir, ['add', '-A']);
-    git(dir, ['commit', '-q', '-m', 'second']);
+    writeFileSync(path.join(dir!, 'a.txt'), 'hello');
+    git(dir!, ['add', '-A']);
+    git(dir!, ['commit', '-q', '-m', 'first']);
+    writeFileSync(path.join(dir!, 'a.txt'), 'changed');
+    git(dir!, ['add', '-A']);
+    git(dir!, ['commit', '-q', '-m', 'second']);
 
-    git(dir, ['checkout', '-q', 'HEAD~1']);
-    writeFileSync(path.join(dir, 'a.txt'), 'dirty uncommitted edit');
+    git(dir!, ['checkout', '-q', 'HEAD~1']);
+    writeFileSync(path.join(dir!, 'a.txt'), 'dirty uncommitted edit');
 
-    const status = getGitStatus(dir);
-    expect(status.branch).toBeNull();
-    expect(status.hasUncommittedChanges).toBe(true);
-    expect(status.changedFileCount).toBe(1);
+    const status = getGitStatus(dir!);
+    expect(status!.branch).toBeNull();
+    expect(status!.hasUncommittedChanges).toBe(true);
+    expect(status!.changedFileCount).toBe(1);
   });
 
   it('returns null for a path that is not a git repo', () => {

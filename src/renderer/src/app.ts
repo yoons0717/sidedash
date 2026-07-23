@@ -1,19 +1,21 @@
-const ACTION_LABELS = {
+import type { ActionExitedPayload, ActionType, ProjectCard } from '../../shared/types';
+
+const ACTION_LABELS: Record<ActionType, string> = {
   pipeline: '파이프라인 실행',
   pdf: 'PDF 생성',
 };
 
-const ACTION_ICONS = {
+const ACTION_ICONS: Record<ActionType, { text: string; className: string }> = {
   pipeline: { text: '>_', className: 'icon-pipeline' },
   pdf: { text: '▤', className: 'icon-pdf' },
 };
 const DEFAULT_ICON = { text: '📁', className: '' };
 
-const runningPaths = new Set();
-let currentProjects = [];
-let sortMode = 'recent';
+const runningPaths = new Set<string>();
+let currentProjects: ProjectCard[] = [];
+let sortMode: 'recent' | 'name' = 'recent';
 
-function formatRelativeTime(isoString, now = new Date()) {
+function formatRelativeTime(isoString: string, now = new Date()): string {
   const diffMs = now.getTime() - new Date(isoString).getTime();
   const minutes = Math.floor(diffMs / 60000);
   if (minutes < 1) return '방금 전';
@@ -24,7 +26,7 @@ function formatRelativeTime(isoString, now = new Date()) {
   return `${days}일 전`;
 }
 
-function sortProjects(projects) {
+function sortProjects(projects: ProjectCard[]): ProjectCard[] {
   const sorted = [...projects];
   if (sortMode === 'name') {
     sorted.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
@@ -39,11 +41,11 @@ function sortProjects(projects) {
   return sorted;
 }
 
-function setActionButtonState(actionBtn, project) {
+function setActionButtonState(actionBtn: HTMLButtonElement, project: ProjectCard): void {
   const running = runningPaths.has(project.path);
   actionBtn.disabled = running;
   actionBtn.classList.toggle('card-action-running', running);
-  actionBtn.textContent = running ? '실행 중…' : ACTION_LABELS[project.action];
+  actionBtn.textContent = running ? '실행 중…' : ACTION_LABELS[project.action!];
 }
 
 // Marks the button running optimistically, before run-action resolves —
@@ -55,7 +57,7 @@ function setActionButtonState(actionBtn, project) {
 // call itself rejecting) has no run in flight to fix it later, so it's
 // undone right here — otherwise the button is stuck on "실행 중…" until
 // the app restarts.
-async function handleRunAction(project, actionBtn, targetPaths) {
+async function handleRunAction(project: ProjectCard, actionBtn: HTMLButtonElement, targetPaths: string[]): Promise<void> {
   if (runningPaths.has(project.path)) {
     return;
   }
@@ -63,7 +65,7 @@ async function handleRunAction(project, actionBtn, targetPaths) {
   setActionButtonState(actionBtn, project);
   try {
     const result = await window.api.runAction(project.path, targetPaths);
-    if (result?.ok === false && result.reason !== 'already-running') {
+    if (result.ok === false && result.reason !== 'already-running') {
       runningPaths.delete(project.path);
       setActionButtonState(actionBtn, project);
     }
@@ -78,21 +80,21 @@ async function handleRunAction(project, actionBtn, targetPaths) {
 // (uncommitted changes) at the same time — deriving expanded-style from
 // current visibility (rather than each toggle setting it directly) keeps
 // the two from clobbering each other's state when only one closes.
-function syncExpandedStyle(card) {
-  const anyOpen = [...card.querySelectorAll('.target-select, .card-files')].some(
+function syncExpandedStyle(card: HTMLElement): void {
+  const anyOpen = [...card.querySelectorAll<HTMLElement>('.target-select, .card-files')].some(
     (panel) => panel.style.display !== 'none'
   );
   card.classList.toggle('expanded-style', anyOpen);
 }
 
-function buildFilesPanel() {
+function buildFilesPanel(): HTMLDivElement {
   const panel = document.createElement('div');
   panel.className = 'card-files';
   panel.style.display = 'none';
   return panel;
 }
 
-async function toggleFilesPanel(project, panel, card) {
+async function toggleFilesPanel(project: ProjectCard, panel: HTMLDivElement, card: HTMLElement): Promise<void> {
   const isOpen = panel.style.display !== 'none';
   if (isOpen) {
     panel.style.display = 'none';
@@ -115,7 +117,7 @@ async function toggleFilesPanel(project, panel, card) {
   syncExpandedStyle(card);
 }
 
-function buildTargetSelectPanel(project, card, actionBtn) {
+function buildTargetSelectPanel(project: ProjectCard, card: HTMLElement, actionBtn: HTMLButtonElement | null): HTMLDivElement {
   const panel = document.createElement('div');
   panel.className = 'target-select';
   panel.style.display = 'none';
@@ -124,7 +126,7 @@ function buildTargetSelectPanel(project, card, actionBtn) {
   panel.addEventListener('click', (event) => event.stopPropagation());
 
   const otherProjects = currentProjects.filter((p) => p.path !== project.path);
-  const checkboxes = [];
+  const checkboxes: HTMLInputElement[] = [];
 
   if (otherProjects.length === 0) {
     const empty = document.createElement('div');
@@ -135,7 +137,7 @@ function buildTargetSelectPanel(project, card, actionBtn) {
       const label = document.createElement('label');
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
-      checkbox.checked = true;
+      checkbox.checked = false;
       checkbox.dataset.path = other.path;
       checkboxes.push(checkbox);
       label.appendChild(checkbox);
@@ -153,10 +155,10 @@ function buildTargetSelectPanel(project, card, actionBtn) {
     runBtn.textContent = '실행';
     runBtn.addEventListener('click', (event) => {
       event.stopPropagation();
-      const targetPaths = checkboxes.filter((cb) => cb.checked).map((cb) => cb.dataset.path);
+      const targetPaths = checkboxes.filter((cb) => cb.checked).map((cb) => cb.dataset.path!);
       panel.style.display = 'none';
       syncExpandedStyle(card);
-      handleRunAction(project, actionBtn, targetPaths);
+      handleRunAction(project, actionBtn!, targetPaths);
     });
     actions.appendChild(runBtn);
   }
@@ -177,7 +179,7 @@ function buildTargetSelectPanel(project, card, actionBtn) {
 
 // Monochrome (currentColor) so hover/opacity styling in CSS applies without
 // per-icon overrides.
-const LINK_ICONS = {
+const LINK_ICONS: Record<string, string> = {
   github:
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>',
   vscode:
@@ -192,10 +194,10 @@ const LINK_ICONS = {
 // inline in the header — with icons *and* an action button both competing
 // for header space, longer project names got truncated again even after
 // switching from text labels to icons.
-function buildLinkButtons(project) {
-  const links = [];
+function buildLinkButtons(project: ProjectCard): HTMLButtonElement[] {
+  const links: [string, string, () => void][] = [];
   if (project.githubUrl) {
-    links.push(['github', 'GitHub에서 열기', () => window.api.openExternal(project.githubUrl)]);
+    links.push(['github', 'GitHub에서 열기', () => window.api.openExternal(project.githubUrl!)]);
   }
   if (project.pathExists) {
     links.push(['vscode', 'VS Code에서 열기', () => window.api.openInVscode(project.path)]);
@@ -216,11 +218,11 @@ function buildLinkButtons(project) {
   });
 }
 
-function renderCard(project) {
+function renderCard(project: ProjectCard): HTMLDivElement {
   const card = document.createElement('div');
   card.className = 'card';
 
-  const icon = ACTION_ICONS[project.action] ?? DEFAULT_ICON;
+  const icon = project.action ? ACTION_ICONS[project.action] : DEFAULT_ICON;
   const iconEl = document.createElement('div');
   iconEl.className = `card-icon ${icon.className}`.trim();
   iconEl.textContent = icon.text;
@@ -237,8 +239,8 @@ function renderCard(project) {
   title.textContent = project.name;
   header.appendChild(title);
 
-  let targetSelectPanel = null;
-  let actionBtn = null;
+  let targetSelectPanel: HTMLDivElement | null = null;
+  let actionBtn: HTMLButtonElement | null = null;
 
   if (project.action) {
     actionBtn = document.createElement('button');
@@ -248,11 +250,11 @@ function renderCard(project) {
     actionBtn.addEventListener('click', (event) => {
       event.stopPropagation();
       if (project.action === 'pipeline') {
-        const isOpen = targetSelectPanel.style.display !== 'none';
-        targetSelectPanel.style.display = isOpen ? 'none' : 'block';
+        const isOpen = targetSelectPanel!.style.display !== 'none';
+        targetSelectPanel!.style.display = isOpen ? 'none' : 'block';
         syncExpandedStyle(card);
       } else {
-        handleRunAction(project, actionBtn, []);
+        handleRunAction(project, actionBtn!, []);
       }
     });
     header.appendChild(actionBtn);
@@ -281,7 +283,7 @@ function renderCard(project) {
 
   const detail = document.createElement('div');
   detail.className = 'card-detail';
-  let filesPanel = null;
+  let filesPanel: HTMLDivElement | null = null;
 
   if (!project.pathExists) {
     detail.classList.add('missing');
@@ -310,7 +312,7 @@ function renderCard(project) {
     // (or a pipeline card's target-select area, which stopPropagates)
     // does nothing.
     card.classList.add('clickable');
-    card.addEventListener('click', () => toggleFilesPanel(project, filesPanel, card));
+    card.addEventListener('click', () => toggleFilesPanel(project, filesPanel!, card));
   }
 
   if (project.action && project.lastRun) {
@@ -330,9 +332,9 @@ function renderCard(project) {
   return card;
 }
 
-function renderProjects(projects) {
-  const listEl = document.getElementById('project-list');
-  const countEl = document.getElementById('project-count');
+function renderProjects(projects: ProjectCard[]): void {
+  const listEl = document.getElementById('project-list')!;
+  const countEl = document.getElementById('project-count')!;
 
   currentProjects = projects;
   countEl.textContent = String(projects.length);
@@ -348,14 +350,14 @@ function renderProjects(projects) {
   });
 }
 
-function setSortMode(mode) {
+function setSortMode(mode: 'recent' | 'name'): void {
   sortMode = mode;
-  document.getElementById('sort-recent').classList.toggle('active', mode === 'recent');
-  document.getElementById('sort-name').classList.toggle('active', mode === 'name');
+  document.getElementById('sort-recent')!.classList.toggle('active', mode === 'recent');
+  document.getElementById('sort-name')!.classList.toggle('active', mode === 'name');
   renderProjects(currentProjects);
 }
 
-async function handleRemove(name) {
+async function handleRemove(name: string): Promise<void> {
   try {
     const projects = await window.api.removeProject(name);
     renderProjects(projects);
@@ -364,7 +366,7 @@ async function handleRemove(name) {
   }
 }
 
-async function handleAdd() {
+async function handleAdd(): Promise<void> {
   try {
     const projects = await window.api.addProject();
     renderProjects(projects);
@@ -373,7 +375,7 @@ async function handleAdd() {
   }
 }
 
-async function refreshProjects() {
+async function refreshProjects(): Promise<void> {
   try {
     const projects = await window.api.getProjectCards();
     renderProjects(projects);
@@ -382,7 +384,7 @@ async function refreshProjects() {
   }
 }
 
-async function handleActionExited({ path }) {
+async function handleActionExited({ path }: ActionExitedPayload): Promise<void> {
   runningPaths.delete(path);
   // Re-fetch rather than just resetting the button: a successful run
   // updates lastRun on disk, and the card needs fresh data to show it
@@ -390,11 +392,11 @@ async function handleActionExited({ path }) {
   await refreshProjects();
 }
 
-async function init() {
-  document.getElementById('add-project').addEventListener('click', handleAdd);
-  document.getElementById('quit-app').addEventListener('click', () => window.api.quitApp());
-  document.getElementById('sort-recent').addEventListener('click', () => setSortMode('recent'));
-  document.getElementById('sort-name').addEventListener('click', () => setSortMode('name'));
+async function init(): Promise<void> {
+  document.getElementById('add-project')!.addEventListener('click', handleAdd);
+  document.getElementById('quit-app')!.addEventListener('click', () => window.api.quitApp());
+  document.getElementById('sort-recent')!.addEventListener('click', () => setSortMode('recent'));
+  document.getElementById('sort-name')!.addEventListener('click', () => setSortMode('name'));
   window.api.onActionExited(handleActionExited);
 
   // menubar keeps this window's page loaded and just shows/hides it rather

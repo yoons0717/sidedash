@@ -2,11 +2,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { getLastRun, recordRun } from './history.js';
+import { getLastRun, recordRun } from './history';
 
 describe('history', () => {
-  let dir;
-  let historyFile;
+  let dir: string | undefined;
+  let historyFile: string;
 
   afterEach(() => {
     if (dir) {
@@ -15,7 +15,7 @@ describe('history', () => {
     }
   });
 
-  function setup() {
+  function setup(): void {
     dir = mkdtempSync(path.join(tmpdir(), 'sidedash-history-'));
     historyFile = path.join(dir, 'last-run.json');
   }
@@ -47,7 +47,7 @@ describe('history', () => {
     recordRun(historyFile, '/Users/x/debrief');
     const after = Date.now();
 
-    const recorded = new Date(getLastRun(historyFile, '/Users/x/debrief')).getTime();
+    const recorded = new Date(getLastRun(historyFile, '/Users/x/debrief')!).getTime();
     expect(recorded).toBeGreaterThanOrEqual(before);
     expect(recorded).toBeLessThanOrEqual(after);
   });

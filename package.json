@@ -2,19 +2,26 @@
   "name": "sidedash",
   "version": "1.0.0",
   "description": "Personal macOS menubar dashboard for running side-project CLI tools",
-  "main": "src/main.js",
+  "main": "out/main/index.js",
   "type": "module",
   "scripts": {
-    "start": "electron .",
+    "dev": "electron-vite dev",
+    "start": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
-    "package": "electron-packager . sidedash --platform=darwin --out=dist --overwrite --prune --icon=build/icon.icns && find dist -exec touch {} +"
+    "package": "electron-vite build && electron-packager . sidedash --platform=darwin --out=dist --overwrite --prune --icon=build/icon.icns --ignore=\"^/src($|/)\" --ignore=\"^/docs($|/)\" --ignore=\"^/build($|/)\" --ignore=\"^/\\.superpowers($|/)\" --ignore=\"^/\\.claude($|/)\" --ignore=\"^/tsconfig.*\\.json$\" --ignore=\"^/electron\\.vite\\.config\\.ts$\" && find dist -exec touch {} +"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@electron/packager": "^20.0.4",
+    "@types/node": "^26.1.1",
     "electron": "^34.5.8",
+    "electron-vite": "^5.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6",
     "vitest": "^4.1.10"
   },
   "dependencies": {

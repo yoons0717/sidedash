@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 
-function readHistory(historyFilePath) {
+type History = Record<string, string>;
+
+function readHistory(historyFilePath: string): History {
   if (!fs.existsSync(historyFilePath)) {
     return {};
   }
@@ -11,12 +13,16 @@ function readHistory(historyFilePath) {
   }
 }
 
-export function recordRun(historyFilePath, projectPath, timestamp = new Date().toISOString()) {
+export function recordRun(
+  historyFilePath: string,
+  projectPath: string,
+  timestamp: string = new Date().toISOString()
+): void {
   const history = readHistory(historyFilePath);
   history[projectPath] = timestamp;
   fs.writeFileSync(historyFilePath, JSON.stringify(history, null, 2));
 }
 
-export function getLastRun(historyFilePath, projectPath) {
+export function getLastRun(historyFilePath: string, projectPath: string): string | null {
   return readHistory(historyFilePath)[projectPath] ?? null;
 }

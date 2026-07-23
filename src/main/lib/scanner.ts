@@ -1,15 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import type { GitStatus, LastCommit } from '../../shared/types';
 
-function runGit(projectPath, args) {
+function runGit(projectPath: string, args: string[]): string {
   return execFileSync('git', ['-C', projectPath, ...args], {
     encoding: 'utf-8',
     stdio: ['ignore', 'pipe', 'ignore'],
   }).trim();
 }
 
-export function getPackageScripts(projectPath) {
+export function getPackageScripts(projectPath: string): Record<string, string> {
   const pkgPath = path.join(projectPath, 'package.json');
   if (!fs.existsSync(pkgPath)) {
     return {};
@@ -22,7 +23,7 @@ export function getPackageScripts(projectPath) {
   }
 }
 
-export function getLastCommit(projectPath) {
+export function getLastCommit(projectPath: string): LastCommit | null {
   try {
     const output = runGit(projectPath, ['log', '-1', '--date=short', '--format=%ad%x1f%s']);
     if (!output) return null;
@@ -33,14 +34,14 @@ export function getLastCommit(projectPath) {
   }
 }
 
-export function getGitStatus(projectPath) {
+export function getGitStatus(projectPath: string): GitStatus | null {
   // symbolic-ref fails whenever HEAD isn't on a branch (detached HEAD —
   // mid-rebase, or a tag/commit checked out directly). That's unrelated to
   // whether `status --porcelain` can run, so it gets its own try/catch —
   // otherwise a detached-HEAD project silently lost its uncommitted-changes
   // count too, since the original single try/catch bailed out on the first
   // failure before ever reaching the status call.
-  let branch = null;
+  let branch: string | null = null;
   try {
     branch = runGit(projectPath, ['symbolic-ref', '--short', 'HEAD']);
   } catch {
@@ -62,7 +63,7 @@ export function getGitStatus(projectPath) {
   }
 }
 
-export function getGitHubUrl(projectPath) {
+export function getGitHubUrl(projectPath: string): string | null {
   try {
     const remote = runGit(projectPath, ['remote', 'get-url', 'origin']);
     const match = remote.match(/^(?:https?:\/\/|git@|ssh:\/\/git@)github\.com[:/]([^/]+)\/(.+?)(\.git)?$/);

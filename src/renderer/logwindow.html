@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>실행 로그</title>
+    <style>
+      body {
+        margin: 0;
+        background: #1e1e1e;
+        color: #ddd;
+      }
+      #log {
+        margin: 0;
+        padding: 12px;
+        font-family: Menlo, Consolas, monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #status {
+        padding: 10px 12px;
+        font-family: Menlo, Consolas, monospace;
+        font-size: 12px;
+        border-top: 1px solid #444;
+      }
+      #status.success { color: #7cd992; }
+      #status.failure { color: #e57373; }
+      #status button {
+        margin-left: 10px;
+        font-size: 12px;
+        font-weight: 600;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #fff;
+        background: #5b5be0;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 7px;
+        cursor: pointer;
+        transition: filter 0.1s ease;
+      }
+      #status button:hover {
+        filter: brightness(1.12);
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="log"></pre>
+    <div id="status"></div>
+    <script type="module" src="./src/logwindow.ts"></script>
+  </body>
+</html>

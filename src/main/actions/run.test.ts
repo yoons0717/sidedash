@@ -11,7 +11,7 @@ import {
   runAction,
   runningProjects,
   shellQuote,
-} from './run.js';
+} from './run';
 
 describe('shellQuote', () => {
   it('wraps a plain string in single quotes', () => {
@@ -44,7 +44,7 @@ describe('shellQuote', () => {
 });
 
 describe('runAction', () => {
-  let tempDir;
+  let tempDir: string | undefined;
 
   afterEach(() => {
     if (tempDir) {
@@ -58,11 +58,11 @@ describe('runAction', () => {
     writeFileSync(path.join(tempDir, 'run.sh'), '#!/bin/bash\necho "$@"\n');
     chmodSync(path.join(tempDir, 'run.sh'), 0o755);
 
-    const project = { path: tempDir, actionType: 'pipeline' };
+    const project = { path: tempDir, actionType: 'pipeline' as const };
     const targetPaths = ['/Users/x/My Project', '/Users/x/other'];
-    const dataChunks = [];
+    const dataChunks: string[] = [];
 
-    await new Promise((resolve) => {
+    await new Promise<void>((resolve) => {
       runAction(project, targetPaths, {
         onData: (chunk) => dataChunks.push(chunk),
         onExit: () => resolve(),
@@ -75,10 +75,10 @@ describe('runAction', () => {
   it('clears runningProjects and reports failure when the process fails to spawn', async () => {
     // A cwd that does not exist makes the OS-level spawn itself fail (ENOENT),
     // which emits 'error' on the ChildProcess instead of a normal 'exit'.
-    const project = { path: '/no/such/directory/for-sidedash-spawn-error-test', actionType: 'pdf' };
-    const dataChunks = [];
+    const project = { path: '/no/such/directory/for-sidedash-spawn-error-test', actionType: 'pdf' as const };
+    const dataChunks: string[] = [];
 
-    const exitCode = await new Promise((resolve) => {
+    const exitCode = await new Promise<number | null>((resolve) => {
       runAction(project, [], {
         onData: (chunk) => dataChunks.push(chunk),
         onExit: (code) => resolve(code),
@@ -91,11 +91,11 @@ describe('runAction', () => {
   });
 
   it('reports isRunning(path) as true while the guard holds the path, false once cleared', async () => {
-    const project = { path: '/no/such/directory/for-sidedash-isrunning-test', actionType: 'pdf' };
+    const project = { path: '/no/such/directory/for-sidedash-isrunning-test', actionType: 'pdf' as const };
 
     expect(isRunning(project.path)).toBe(false);
 
-    await new Promise((resolve) => {
+    await new Promise<void>((resolve) => {
       runAction(project, [], { onExit: () => resolve() });
       // The guard is added synchronously before spawn() is even attempted,
       // so it must already be true in the same tick runAction was called.
@@ -117,11 +117,11 @@ describe('runAction', () => {
     );
     chmodSync(path.join(tempDir, 'run.sh'), 0o755);
 
-    const project = { path: tempDir, actionType: 'pipeline' };
+    const project = { path: tempDir, actionType: 'pipeline' as const };
 
     expect(hasRunningActions()).toBe(false);
 
-    const exitPromise = new Promise((resolve) => {
+    const exitPromise = new Promise<number | null>((resolve) => {
       runAction(project, [], { onExit: (code) => resolve(code) });
     });
 

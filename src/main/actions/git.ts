@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
+import type { UncommittedFile } from '../../shared/types';
 
-export function getUncommittedFiles(projectPath) {
+export function getUncommittedFiles(projectPath: string): UncommittedFile[] {
   try {
     const output = execFileSync('git', ['-C', projectPath, 'status', '--porcelain'], {
       encoding: 'utf-8',

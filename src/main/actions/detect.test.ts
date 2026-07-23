@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { detectAction } from './detect.js';
+import { detectAction } from './detect';
 
 describe('detectAction', () => {
-  let dir;
+  let dir: string;
 
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sidedash-detect-'));

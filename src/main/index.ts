@@ -1,16 +1,23 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { app, ipcMain, dialog, shell, Notification } from 'electron';
 import { menubar } from 'menubar';
-import * as registry from './lib/registry.js';
-import { getProjectCards, canAddProject } from './ipc/projects.js';
-import { runAction, isRunning, hasRunningActions, killAllRunning, shellQuote } from './actions/run.js';
-import { recordRun } from './actions/history.js';
-import { getUncommittedFiles } from './actions/git.js';
-import { openLogWindow } from './logwindow.js';
+import * as registry from './lib/registry';
+import { getProjectCards, canAddProject } from './ipc/projects';
+import { runAction, isRunning, hasRunningActions, killAllRunning, shellQuote } from './actions/run';
+import { recordRun } from './actions/history';
+import { getUncommittedFiles } from './actions/git';
+import { openLogWindow } from './logwindow';
+import type { ActionType, AddProjectRejectionReason, RunActionResult } from '../shared/types';
+// `?asset` doesn't copy this into `out/` — it resolves to a path relative to
+// the project root (`out/main/../../resources/IconTemplate.png`), relying on
+// `resources/` shipping alongside `out/` in the packaged app (true for the
+// current non-asar `electron-packager` setup; would break under `--asar` or
+// a bundler that packs `out/` on its own). IconTemplate@2x.png needs no
+// import of its own — menubar finds it next to the base icon via filename
+// convention, and it ships because the whole `resources/` dir ships as-is.
+import iconPath from '../../resources/IconTemplate.png?asset';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HISTORY_FILE = path.join(app.getPath('userData'), 'last-run.json');
 
 app.dock.hide();
@@ -22,25 +29,30 @@ if (app.isPackaged) {
   app.setLoginItemSettings({ openAtLogin: true });
 }
 
+const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
+
 const mb = menubar({
-  index: `file://${path.join(__dirname, 'index.html')}`,
-  // menubar's default icon lookup is `<options.dir>/IconTemplate.png`, and
-  // options.dir defaults to app.getAppPath() (the project root) — not this
-  // src/ directory where the icon files actually live. Without this explicit
-  // path it silently falls back to menubar's own bundled default icon.
-  icon: path.join(__dirname, 'IconTemplate.png'),
+  index:
+    import.meta.env.DEV && rendererUrl
+      ? `${rendererUrl}/index.html`
+      : `file://${path.join(__dirname, '../renderer/index.html')}`,
+  icon: iconPath,
   browserWindow: {
     width: 360,
     height: 560,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
+      // electron-vite builds the preload script as an ES module (.mjs);
+      // ESM preload scripts aren't supported under Electron's default
+      // sandboxed preload, so sandboxing needs to be off explicitly.
+      sandbox: false,
+      preload: path.join(__dirname, '../preload/index.mjs'),
     },
   },
 });
 
 ipcMain.handle('get-project-cards', () => getProjectCards(HISTORY_FILE));
 
-const ADD_REJECTION_MESSAGES = {
+const ADD_REJECTION_MESSAGES: Record<AddProjectRejectionReason, string> = {
   'already-registered': '이미 등록된 프로젝트입니다.',
   'name-collision': '같은 이름의 프로젝트가 이미 등록되어 있습니다. 폴더 이름이 겹치지 않게 해주세요.',
 };
@@ -49,12 +61,12 @@ ipcMain.handle('add-project', async () => {
   // Passing the popup window as parent attaches these as sheets on macOS
   // instead of separate windows — without it, the popup loses focus the
   // moment the dialog opens and menubar's hide-on-blur closes it underneath.
-  const result = await dialog.showOpenDialog(mb.window, { properties: ['openDirectory'] });
+  const result = await dialog.showOpenDialog(mb.window!, { properties: ['openDirectory'] });
   if (!result.canceled && result.filePaths.length > 0) {
     const projectPath = result.filePaths[0];
     const check = canAddProject(projectPath, registry.getAll());
     if (!check.ok) {
-      await dialog.showMessageBox(mb.window, { type: 'warning', message: ADD_REJECTION_MESSAGES[check.reason] });
+      await dialog.showMessageBox(mb.window!, { type: 'warning', message: ADD_REJECTION_MESSAGES[check.reason] });
       return getProjectCards(HISTORY_FILE);
     }
     const name = path.basename(projectPath);
@@ -63,30 +75,30 @@ ipcMain.handle('add-project', async () => {
   return getProjectCards(HISTORY_FILE);
 });
 
-ipcMain.handle('remove-project', (event, name) => {
+ipcMain.handle('remove-project', (_event, name: string) => {
   registry.remove(name);
   return getProjectCards(HISTORY_FILE);
 });
 
-ipcMain.handle('open-external', (event, url) => shell.openExternal(url));
+ipcMain.handle('open-external', (_event, url: string) => shell.openExternal(url));
 
 // shell.openPath resolves with an error string on failure (not a rejection),
 // so a bad path fails silently unless that string is checked.
-ipcMain.handle('open-in-finder', async (event, projectPath) => {
+ipcMain.handle('open-in-finder', async (_event, projectPath: string) => {
   const error = await shell.openPath(projectPath);
   if (error) {
     dialog.showErrorBox('Finder에서 열 수 없습니다', error);
   }
 });
 
-ipcMain.handle('get-uncommitted-files', (event, projectPath) => getUncommittedFiles(projectPath));
+ipcMain.handle('get-uncommitted-files', (_event, projectPath: string) => getUncommittedFiles(projectPath));
 
 // Neither `open -a` nor a missing shell command produce a spawn 'error'
 // event on their own (the child process itself launches fine) — the failure
 // shows up as stderr + a non-zero exit code instead. Without listening for
 // both, a missing app/CLI fails completely silently (or, if 'error' really
 // does fire and nothing handles it, can crash the main process).
-function spawnAndReportErrors(label, command, args) {
+function spawnAndReportErrors(label: string, command: string, args: string[]): void {
   const child = spawn(command, args);
   let stderr = '';
   child.stderr?.on('data', (chunk) => {
@@ -104,7 +116,7 @@ function spawnAndReportErrors(label, command, args) {
 
 // `open -a` resolves the app by name via Launch Services, so it works
 // regardless of whether the `code` shell command is installed.
-ipcMain.handle('open-in-vscode', (event, projectPath) => {
+ipcMain.handle('open-in-vscode', (_event, projectPath: string) => {
   spawnAndReportErrors('VS Code', 'open', ['-a', 'Visual Studio Code', projectPath]);
 });
 
@@ -118,13 +130,13 @@ const CMUX_CLI = '/Applications/cmux.app/Contents/Resources/bin/cmux';
 // `cmux <path>` only creates the workspace over its control socket, it
 // doesn't raise the app — without `open -a cmux` after it, the workspace
 // opens invisibly behind whatever window already has focus.
-ipcMain.handle('open-in-cmux', (event, projectPath) => {
+ipcMain.handle('open-in-cmux', (_event, projectPath: string) => {
   spawnAndReportErrors('cmux', '/bin/zsh', ['-lc', `${shellQuote(CMUX_CLI)} ${shellQuote(projectPath)} && open -a cmux`]);
 });
 
 ipcMain.handle('quit-app', async () => {
   if (hasRunningActions()) {
-    const result = await dialog.showMessageBox(mb.window, {
+    const result = await dialog.showMessageBox(mb.window!, {
       type: 'warning',
       buttons: ['종료', '취소'],
       defaultId: 1,
@@ -139,7 +151,7 @@ ipcMain.handle('quit-app', async () => {
   app.quit();
 });
 
-const ACTION_LABELS = {
+const ACTION_LABELS: Record<ActionType, string> = {
   pipeline: '파이프라인 실행',
   pdf: 'PDF 생성',
 };
@@ -151,7 +163,7 @@ const ACTION_LABELS = {
 // optimistically marks the button running before this call resolves, and
 // nothing ever un-marks it for the "didn't start" case since no run started
 // to eventually fire action-exited.
-ipcMain.handle('run-action', (event, projectPath, targetPaths) => {
+ipcMain.handle('run-action', (_event, projectPath: string, targetPaths: string[]): RunActionResult => {
   const cards = getProjectCards(HISTORY_FILE);
   const project = cards.find((p) => p.path === projectPath);
   if (!project || !project.action) {
@@ -181,7 +193,7 @@ ipcMain.handle('run-action', (event, projectPath, targetPaths) => {
           recordRun(HISTORY_FILE, project.path);
         }
 
-        const actionLabel = ACTION_LABELS[project.action];
+        const actionLabel = ACTION_LABELS[project.action!];
         const body =
           code === 0 ? `${actionLabel} 완료`
           : code === null ? `${actionLabel} 실패 (프로세스를 시작하지 못함)`

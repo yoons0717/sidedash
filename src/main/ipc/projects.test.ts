@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canAddProject } from './projects.js';
+import { canAddProject } from './projects';
 
 describe('canAddProject', () => {
   it('allows adding a path that is not already registered', () => {
