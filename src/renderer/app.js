@@ -184,18 +184,14 @@ const LINK_ICONS = {
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4 1 8l4 4M11 4l4 4-4 4"/></svg>',
   finder:
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M1.5 3A1.5 1.5 0 013 1.5h3.5L8 3.5h4.5A1.5 1.5 0 0114 5v7.5A1.5 1.5 0 0112.5 14h-9A1.5 1.5 0 012 12.5V3z"/></svg>',
+  cmux:
+    '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M4 6.5 6.5 9 4 11.5M8 11.5h4"/></svg>',
 };
 
 // Rendered as their own row below the title (see renderCard) rather than
 // inline in the header — with icons *and* an action button both competing
 // for header space, longer project names got truncated again even after
 // switching from text labels to icons.
-//
-// cmux isn't offered here (yet): its CLI refuses connections from anything
-// it didn't launch itself ("Access denied — only processes started inside
-// cmux can connect"), so sidedash can't drive it without the user first
-// setting up a socket password in cmux's own Settings. openInCmux is still
-// wired up in main.js/preload for whenever that gets sorted out.
 function buildLinkButtons(project) {
   const links = [];
   if (project.githubUrl) {
@@ -204,6 +200,7 @@ function buildLinkButtons(project) {
   if (project.pathExists) {
     links.push(['vscode', 'VS Code에서 열기', () => window.api.openInVscode(project.path)]);
     links.push(['finder', 'Finder에서 열기', () => window.api.openInFinder(project.path)]);
+    links.push(['cmux', 'cmux에서 열기', () => window.api.openInCmux(project.path)]);
   }
 
   return links.map(([icon, title, onClick]) => {
