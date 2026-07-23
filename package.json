@@ -7,7 +7,7 @@
   "scripts": {
     "start": "electron .",
     "test": "vitest run",
-    "package": "electron-packager . sidedash --platform=darwin --out=dist --overwrite --prune --icon=build/icon.icns"
+    "package": "electron-packager . sidedash --platform=darwin --out=dist --overwrite --prune --icon=build/icon.icns && find dist -exec touch {} +"
   },
   "keywords": [],
   "author": "",
