@@ -127,23 +127,46 @@ function buildTargetSelectPanel(project: ProjectCard, card: HTMLElement, actionB
 
   const otherProjects = currentProjects.filter((p) => p.path !== project.path);
   const checkboxes: HTMLInputElement[] = [];
+  let preview: HTMLDivElement | null = null;
+
+  // Purely illustrative quoting for the preview line — the actual command
+  // sent to the shell uses run.ts's shellQuote (single-quote escaping), not
+  // this. Showing that exact escaping here would need duplicating it in the
+  // renderer just to render a hint, which isn't worth the coupling.
+  function updatePreview(): void {
+    if (!preview) return;
+    const checked = checkboxes.filter((cb) => cb.checked);
+    const args = checked.map((cb) => `"${cb.dataset.path}"`).join(' ');
+    preview.textContent = `$ ./run.sh${args ? ' ' + args : ''}`;
+  }
 
   if (otherProjects.length === 0) {
     const empty = document.createElement('div');
     empty.textContent = '대상으로 고를 다른 프로젝트가 없어요.';
     panel.appendChild(empty);
   } else {
+    const hint = document.createElement('div');
+    hint.className = 'target-select-hint';
+    hint.textContent = '체크한 프로젝트의 경로가 아래처럼 run.sh 인자로 전달됩니다.';
+    panel.appendChild(hint);
+
     for (const other of otherProjects) {
       const label = document.createElement('label');
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.checked = false;
       checkbox.dataset.path = other.path;
+      checkbox.addEventListener('change', updatePreview);
       checkboxes.push(checkbox);
       label.appendChild(checkbox);
       label.appendChild(document.createTextNode(other.name));
       panel.appendChild(label);
     }
+
+    preview = document.createElement('div');
+    preview.className = 'target-select-preview';
+    panel.appendChild(preview);
+    updatePreview();
   }
 
   const actions = document.createElement('div');
