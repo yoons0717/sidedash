@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#312e81"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1024" height="1024" rx="224" fill="url(#bg)"/>
+
+  <!-- idle project cards -->
+  <rect x="232" y="232" width="260" height="260" rx="40" fill="#ffffff" opacity="0.16"/>
+  <rect x="532" y="232" width="260" height="260" rx="40" fill="#ffffff" opacity="0.16"/>
+  <rect x="232" y="532" width="260" height="260" rx="40" fill="#ffffff" opacity="0.16"/>
+
+  <!-- active project card -->
+  <rect x="532" y="532" width="260" height="260" rx="40" fill="url(#accent)"/>
+  <path d="M 630 610 L 630 714 L 716 662 Z" fill="#ffffff"/>
+</svg>
