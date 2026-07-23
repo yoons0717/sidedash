@@ -15,6 +15,13 @@ const HISTORY_FILE = path.join(app.getPath('userData'), 'last-run.json');
 
 app.dock.hide();
 
+// Only the packaged .app should register as a login item — app.isPackaged
+// is false under `electron .`, which would otherwise add the shared
+// node_modules/electron binary itself to Login Items.
+if (app.isPackaged) {
+  app.setLoginItemSettings({ openAtLogin: true });
+}
+
 const mb = menubar({
   index: `file://${path.join(__dirname, 'index.html')}`,
   // menubar's default icon lookup is `<options.dir>/IconTemplate.png`, and
