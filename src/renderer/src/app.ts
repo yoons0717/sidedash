@@ -307,6 +307,7 @@ function renderCard(project: ProjectCard): HTMLDivElement {
   const detail = document.createElement('div');
   detail.className = 'card-detail';
   let filesPanel: HTMLDivElement | null = null;
+  let detailMainSpan: HTMLSpanElement | null = null;
 
   if (!project.pathExists) {
     detail.classList.add('missing');
@@ -315,11 +316,22 @@ function renderCard(project: ProjectCard): HTMLDivElement {
     const branch = project.branch ?? '(알 수 없음)';
     const commitMessage = project.lastCommit ? project.lastCommit.message : '(커밋 없음)';
 
+    const mainSpan = document.createElement('span');
+    mainSpan.className = 'card-detail-main';
     const branchSpan = document.createElement('span');
     branchSpan.className = 'card-branch';
     branchSpan.textContent = branch;
-    detail.appendChild(branchSpan);
-    detail.appendChild(document.createTextNode(` · ${commitMessage}`));
+    mainSpan.appendChild(branchSpan);
+    mainSpan.appendChild(document.createTextNode(` · ${commitMessage}`));
+    detail.appendChild(mainSpan);
+    detailMainSpan = mainSpan;
+
+    if (project.lastCommit) {
+      const dateSpan = document.createElement('span');
+      dateSpan.className = 'card-detail-date';
+      dateSpan.textContent = project.lastCommit.date;
+      detail.appendChild(dateSpan);
+    }
   }
   body.appendChild(detail);
 
@@ -331,11 +343,18 @@ function renderCard(project: ProjectCard): HTMLDivElement {
 
     filesPanel = buildFilesPanel();
     body.appendChild(filesPanel);
-    // Only dirty cards have anything to expand — clicking a clean card
-    // (or a pipeline card's target-select area, which stopPropagates)
-    // does nothing.
+  }
+
+  // Clicking a card toggles its truncated commit message open, and (for
+  // dirty cards) the uncommitted-files panel at the same time.
+  if (detailMainSpan || filesPanel) {
     card.classList.add('clickable');
-    card.addEventListener('click', () => toggleFilesPanel(project, filesPanel!, card));
+    card.addEventListener('click', () => {
+      detailMainSpan?.classList.toggle('expanded');
+      if (filesPanel) {
+        toggleFilesPanel(project, filesPanel, card);
+      }
+    });
   }
 
   if (project.action && project.lastRun) {
