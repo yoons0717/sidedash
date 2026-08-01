@@ -1,10 +1,10 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
-import type { ActionType } from '../../shared/types';
+import type { RunKind } from '../../shared/types';
 
 export interface RunnableProject {
   path: string;
-  actionType: ActionType;
+  actionType: RunKind;
 }
 
 export interface RunActionCallbacks {
@@ -14,6 +14,13 @@ export interface RunActionCallbacks {
 
 export function shellQuote(str: string): string {
   return `'${str.replace(/'/g, `'\\''`)}'`;
+}
+
+export const ANALYSIS_PROMPT =
+  '이 프로젝트의 README, 최근 git 커밋 로그, 소스 파일 구조를 읽고, 지금 이 프로젝트가 어디까지 완성됐고 어디서 작업이 멈췄는지를 2~3문장의 평문으로 요약해줘. 마크다운 형식이나 글머리 기호는 쓰지 말고, 완성도를 숫자나 퍼센트로 매기지 말고, 이 프로젝트를 계속하는 게 좋을지 말지는 추천하지 마.';
+
+export function buildAnalyzeCommand(): string {
+  return `claude -p ${shellQuote(ANALYSIS_PROMPT)}`;
 }
 
 export function createUtf8Decoder(): (chunk: Buffer) => string {
@@ -61,6 +68,8 @@ export function runAction(
     command = './run.sh ' + quotedPaths.join(' ');
   } else if (project.actionType === 'pdf') {
     command = 'npm run pdf';
+  } else if (project.actionType === 'analyze') {
+    command = buildAnalyzeCommand();
   } else {
     return;
   }

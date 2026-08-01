@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  ANALYSIS_PROMPT,
+  buildAnalyzeCommand,
   createUtf8Decoder,
   hasRunningActions,
   isRunning,
@@ -40,6 +42,12 @@ describe('shellQuote', () => {
     const output = execFileSync('/bin/zsh', ['-lc', `printf '%s\\n' ${quoted}`]).toString();
 
     expect(output.split('\n').filter(Boolean)).toEqual([original]);
+  });
+});
+
+describe('buildAnalyzeCommand', () => {
+  it('wraps the analysis prompt as a single quoted argument to claude -p', () => {
+    expect(buildAnalyzeCommand()).toBe(`claude -p ${shellQuote(ANALYSIS_PROMPT)}`);
   });
 });
 

@@ -1,5 +1,7 @@
 export type ActionType = 'pipeline' | 'pdf';
 
+export type RunKind = ActionType | 'analyze';
+
 export interface RegistryEntry {
   name: string;
   path: string;
@@ -56,5 +58,5 @@ export interface ActionExitedPayload {
 export interface LogExitPayload {
   code: number | null;
   path: string;
-  actionType: ActionType;
+  actionType: RunKind;
 }
