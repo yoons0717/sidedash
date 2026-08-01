@@ -6,6 +6,7 @@ import * as registry from './lib/registry';
 import { getProjectCards, canAddProject } from './ipc/projects';
 import { runAction, isRunning, hasRunningActions, killAllRunning, shellQuote } from './actions/run';
 import { recordRun } from './actions/history';
+import { recordAnalysis } from './actions/analysis';
 import { getUncommittedFiles } from './actions/git';
 import { openLogWindow } from './logwindow';
 import type { ActionType, AddProjectRejectionReason, RunActionResult } from '../shared/types';
@@ -199,6 +200,54 @@ ipcMain.handle('run-action', (_event, projectPath: string, targetPaths: string[]
           code === 0 ? `${actionLabel} 완료`
           : code === null ? `${actionLabel} 실패 (프로세스를 시작하지 못함)`
           : `${actionLabel} 실패 (종료 코드 ${code})`;
+        const notification = new Notification({ title: project.name, body });
+        notification.on('click', () => logWindow.focus());
+        notification.show();
+      },
+    }
+  );
+
+  return { ok: true };
+});
+
+const ANALYSIS_LABEL = '상태 분석';
+
+ipcMain.handle('run-analysis', (_event, projectPath: string): RunActionResult => {
+  const cards = getProjectCards(HISTORY_FILE, ANALYSIS_FILE);
+  const project = cards.find((p) => p.path === projectPath);
+  if (!project) {
+    return { ok: false, reason: 'invalid' };
+  }
+
+  if (isRunning(project.path)) {
+    return { ok: false, reason: 'already-running' };
+  }
+
+  const projectWithType = { ...project, actionType: 'analyze' as const };
+  const logWindow = openLogWindow(project.name, projectWithType);
+
+  let summary = '';
+
+  runAction(
+    projectWithType,
+    [],
+    {
+      onData: (chunk) => {
+        summary += chunk;
+        logWindow.appendData(chunk);
+      },
+      onExit: (code) => {
+        mb.window?.webContents.send('action-exited', { path: project.path, code });
+        logWindow.finish(code);
+
+        if (code === 0) {
+          recordAnalysis(ANALYSIS_FILE, project.path, summary.trim());
+        }
+
+        const body =
+          code === 0 ? `${ANALYSIS_LABEL} 완료`
+          : code === null ? `${ANALYSIS_LABEL} 실패 (프로세스를 시작하지 못함)`
+          : `${ANALYSIS_LABEL} 실패 (종료 코드 ${code})`;
         const notification = new Notification({ title: project.name, body });
         notification.on('click', () => logWindow.focus());
         notification.show();

@@ -7,6 +7,7 @@ const api = {
   removeProject: (name: string): Promise<ProjectCard[]> => ipcRenderer.invoke('remove-project', name),
   runAction: (path: string, targetPaths: string[]): Promise<RunActionResult> =>
     ipcRenderer.invoke('run-action', path, targetPaths),
+  runAnalysis: (path: string): Promise<RunActionResult> => ipcRenderer.invoke('run-analysis', path),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('open-external', url),
   openInVscode: (path: string): Promise<void> => ipcRenderer.invoke('open-in-vscode', path),
   openInCmux: (path: string): Promise<void> => ipcRenderer.invoke('open-in-cmux', path),
