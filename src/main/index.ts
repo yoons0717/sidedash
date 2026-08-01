@@ -19,6 +19,7 @@ import type { ActionType, AddProjectRejectionReason, RunActionResult } from '../
 import iconPath from '../../resources/IconTemplate.png?asset';
 
 const HISTORY_FILE = path.join(app.getPath('userData'), 'last-run.json');
+const ANALYSIS_FILE = path.join(app.getPath('userData'), 'analysis.json');
 
 app.dock.hide();
 
@@ -50,7 +51,7 @@ const mb = menubar({
   },
 });
 
-ipcMain.handle('get-project-cards', () => getProjectCards(HISTORY_FILE));
+ipcMain.handle('get-project-cards', () => getProjectCards(HISTORY_FILE, ANALYSIS_FILE));
 
 const ADD_REJECTION_MESSAGES: Record<AddProjectRejectionReason, string> = {
   'already-registered': '이미 등록된 프로젝트입니다.',
@@ -67,17 +68,17 @@ ipcMain.handle('add-project', async () => {
     const check = canAddProject(projectPath, registry.getAll());
     if (!check.ok) {
       await dialog.showMessageBox(mb.window!, { type: 'warning', message: ADD_REJECTION_MESSAGES[check.reason] });
-      return getProjectCards(HISTORY_FILE);
+      return getProjectCards(HISTORY_FILE, ANALYSIS_FILE);
     }
     const name = path.basename(projectPath);
     registry.add(name, projectPath);
   }
-  return getProjectCards(HISTORY_FILE);
+  return getProjectCards(HISTORY_FILE, ANALYSIS_FILE);
 });
 
 ipcMain.handle('remove-project', (_event, name: string) => {
   registry.remove(name);
-  return getProjectCards(HISTORY_FILE);
+  return getProjectCards(HISTORY_FILE, ANALYSIS_FILE);
 });
 
 ipcMain.handle('open-external', (_event, url: string) => shell.openExternal(url));
@@ -164,7 +165,7 @@ const ACTION_LABELS: Record<ActionType, string> = {
 // nothing ever un-marks it for the "didn't start" case since no run started
 // to eventually fire action-exited.
 ipcMain.handle('run-action', (_event, projectPath: string, targetPaths: string[]): RunActionResult => {
-  const cards = getProjectCards(HISTORY_FILE);
+  const cards = getProjectCards(HISTORY_FILE, ANALYSIS_FILE);
   const project = cards.find((p) => p.path === projectPath);
   if (!project || !project.action) {
     return { ok: false, reason: 'invalid' };

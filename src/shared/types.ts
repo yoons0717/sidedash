@@ -40,6 +40,7 @@ export interface ProjectCard {
   action: ActionType | null;
   lastRun: string | null;
   githubUrl: string | null;
+  lastAnalysis: AnalysisResult | null;
 }
 
 export type AddProjectRejectionReason = 'already-registered' | 'name-collision';
