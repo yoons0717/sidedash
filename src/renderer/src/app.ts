@@ -57,22 +57,71 @@ function setActionButtonState(actionBtn: HTMLButtonElement, project: ProjectCard
 // call itself rejecting) has no run in flight to fix it later, so it's
 // undone right here — otherwise the button is stuck on "실행 중…" until
 // the app restarts.
-async function handleRunAction(project: ProjectCard, actionBtn: HTMLButtonElement, targetPaths: string[]): Promise<void> {
+function setAnalyzeButtonState(analyzeBtn: HTMLButtonElement, project: ProjectCard): void {
+  const running = runningPaths.has(project.path);
+  analyzeBtn.disabled = running;
+  analyzeBtn.classList.toggle('card-action-running', running);
+  analyzeBtn.textContent = running
+    ? '실행 중…'
+    : project.lastAnalysis
+      ? '🔍 다시 분석'
+      : '🔍 상태 분석';
+}
+
+// Both buttons on a card share the same backend busy guard (runningProjects
+// is keyed by path only, not by action), so starting either one must also
+// visually disable the other immediately — otherwise the sibling button
+// stays clickable until the next full refreshProjects() re-render.
+async function handleRunAction(
+  project: ProjectCard,
+  actionBtn: HTMLButtonElement,
+  analyzeBtn: HTMLButtonElement | null,
+  targetPaths: string[]
+): Promise<void> {
   if (runningPaths.has(project.path)) {
     return;
   }
   runningPaths.add(project.path);
   setActionButtonState(actionBtn, project);
+  if (analyzeBtn) setAnalyzeButtonState(analyzeBtn, project);
   try {
     const result = await window.api.runAction(project.path, targetPaths);
     if (result.ok === false && result.reason !== 'already-running') {
       runningPaths.delete(project.path);
       setActionButtonState(actionBtn, project);
+      if (analyzeBtn) setAnalyzeButtonState(analyzeBtn, project);
     }
   } catch (err) {
     console.error('run-action failed:', err);
     runningPaths.delete(project.path);
     setActionButtonState(actionBtn, project);
+    if (analyzeBtn) setAnalyzeButtonState(analyzeBtn, project);
+  }
+}
+
+async function handleRunAnalysis(
+  project: ProjectCard,
+  analyzeBtn: HTMLButtonElement,
+  actionBtn: HTMLButtonElement | null
+): Promise<void> {
+  if (runningPaths.has(project.path)) {
+    return;
+  }
+  runningPaths.add(project.path);
+  setAnalyzeButtonState(analyzeBtn, project);
+  if (actionBtn) setActionButtonState(actionBtn, project);
+  try {
+    const result = await window.api.runAnalysis(project.path);
+    if (result.ok === false && result.reason !== 'already-running') {
+      runningPaths.delete(project.path);
+      setAnalyzeButtonState(analyzeBtn, project);
+      if (actionBtn) setActionButtonState(actionBtn, project);
+    }
+  } catch (err) {
+    console.error('run-analysis failed:', err);
+    runningPaths.delete(project.path);
+    setAnalyzeButtonState(analyzeBtn, project);
+    if (actionBtn) setActionButtonState(actionBtn, project);
   }
 }
 
@@ -117,7 +166,12 @@ async function toggleFilesPanel(project: ProjectCard, panel: HTMLDivElement, car
   syncExpandedStyle(card);
 }
 
-function buildTargetSelectPanel(project: ProjectCard, card: HTMLElement, actionBtn: HTMLButtonElement | null): HTMLDivElement {
+function buildTargetSelectPanel(
+  project: ProjectCard,
+  card: HTMLElement,
+  actionBtn: HTMLButtonElement | null,
+  analyzeBtn: HTMLButtonElement | null
+): HTMLDivElement {
   const panel = document.createElement('div');
   panel.className = 'target-select';
   panel.style.display = 'none';
@@ -181,7 +235,7 @@ function buildTargetSelectPanel(project: ProjectCard, card: HTMLElement, actionB
       const targetPaths = checkboxes.filter((cb) => cb.checked).map((cb) => cb.dataset.path!);
       panel.style.display = 'none';
       syncExpandedStyle(card);
-      handleRunAction(project, actionBtn!, targetPaths);
+      handleRunAction(project, actionBtn!, analyzeBtn, targetPaths);
     });
     actions.appendChild(runBtn);
   }
@@ -264,6 +318,7 @@ function renderCard(project: ProjectCard): HTMLDivElement {
 
   let targetSelectPanel: HTMLDivElement | null = null;
   let actionBtn: HTMLButtonElement | null = null;
+  let analyzeBtn: HTMLButtonElement | null = null;
 
   if (project.action) {
     actionBtn = document.createElement('button');
@@ -277,10 +332,19 @@ function renderCard(project: ProjectCard): HTMLDivElement {
         targetSelectPanel!.style.display = isOpen ? 'none' : 'block';
         syncExpandedStyle(card);
       } else {
-        handleRunAction(project, actionBtn!, []);
+        handleRunAction(project, actionBtn!, analyzeBtn, []);
       }
     });
     header.appendChild(actionBtn);
+  }
+
+  if (project.pathExists) {
+    const analysisTag = document.createElement('span');
+    analysisTag.className = 'card-analysis-tag' + (project.lastAnalysis ? ' done' : '');
+    analysisTag.textContent = project.lastAnalysis
+      ? `${formatRelativeTime(project.lastAnalysis.analyzedAt)} 분석`
+      : '미분석';
+    header.appendChild(analysisTag);
   }
 
   const removeBtn = document.createElement('button');
@@ -335,6 +399,29 @@ function renderCard(project: ProjectCard): HTMLDivElement {
   }
   body.appendChild(detail);
 
+  if (project.pathExists) {
+    if (project.lastAnalysis) {
+      const analysisBox = document.createElement('div');
+      analysisBox.className = 'card-analysis';
+      analysisBox.textContent = project.lastAnalysis.summary;
+      body.appendChild(analysisBox);
+    }
+
+    analyzeBtn = document.createElement('button');
+    analyzeBtn.className = 'card-action card-action-secondary';
+    analyzeBtn.dataset.path = project.path;
+    setAnalyzeButtonState(analyzeBtn, project);
+    analyzeBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      handleRunAnalysis(project, analyzeBtn!, actionBtn);
+    });
+
+    const analyzeRow = document.createElement('div');
+    analyzeRow.className = 'card-analyze-row';
+    analyzeRow.appendChild(analyzeBtn);
+    body.appendChild(analyzeRow);
+  }
+
   if (project.hasUncommittedChanges) {
     const dirtyLine = document.createElement('div');
     dirtyLine.className = 'card-dirty-toggle';
@@ -365,7 +452,7 @@ function renderCard(project: ProjectCard): HTMLDivElement {
   }
 
   if (project.action === 'pipeline') {
-    targetSelectPanel = buildTargetSelectPanel(project, card, actionBtn);
+    targetSelectPanel = buildTargetSelectPanel(project, card, actionBtn, analyzeBtn);
     body.appendChild(targetSelectPanel);
   }
 
