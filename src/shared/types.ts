@@ -11,6 +11,11 @@ export interface LastCommit {
   message: string;
 }
 
+export interface AnalysisResult {
+  summary: string;
+  analyzedAt: string;
+}
+
 export interface GitStatus {
   branch: string | null;
   hasUncommittedChanges: boolean;
