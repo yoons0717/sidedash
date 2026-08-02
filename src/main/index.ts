@@ -91,13 +91,21 @@ ipcMain.handle('add-project', async () => {
       return getProjectCards(HISTORY_FILE, ANALYSIS_FILE);
     }
     const name = path.basename(projectPath);
-    registry.add(name, projectPath);
+    try {
+      registry.add(name, projectPath);
+    } catch (err) {
+      dialog.showErrorBox('프로젝트를 추가할 수 없습니다', err instanceof Error ? err.message : String(err));
+    }
   }
   return getProjectCards(HISTORY_FILE, ANALYSIS_FILE);
 });
 
 ipcMain.handle('remove-project', (_event, name: string) => {
-  registry.remove(name);
+  try {
+    registry.remove(name);
+  } catch (err) {
+    dialog.showErrorBox('프로젝트를 삭제할 수 없습니다', err instanceof Error ? err.message : String(err));
+  }
   return getProjectCards(HISTORY_FILE, ANALYSIS_FILE);
 });
 

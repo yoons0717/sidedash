@@ -290,7 +290,7 @@ function buildLinkButtons(project: ProjectCard): HTMLButtonElement[] {
     link.title = title;
     link.addEventListener('click', (event) => {
       event.stopPropagation();
-      onClick();
+      Promise.resolve(onClick()).catch((err) => console.error(`${title} failed:`, err));
     });
     return link;
   });
@@ -532,7 +532,9 @@ async function handleActionExited({ path }: ActionExitedPayload): Promise<void> 
 
 async function init(): Promise<void> {
   document.getElementById('add-project')!.addEventListener('click', handleAdd);
-  document.getElementById('quit-app')!.addEventListener('click', () => window.api.quitApp());
+  document.getElementById('quit-app')!.addEventListener('click', () => {
+    window.api.quitApp().catch((err) => console.error('quit-app failed:', err));
+  });
   document.getElementById('sort-recent')!.addEventListener('click', () => setSortMode('recent'));
   document.getElementById('sort-name')!.addEventListener('click', () => setSortMode('name'));
   window.api.onActionExited(handleActionExited);
