@@ -1,10 +1,10 @@
 import path from 'node:path';
 import { BrowserWindow } from 'electron';
-import type { ActionType } from '../shared/types';
+import type { RunKind } from '../shared/types';
 
 interface LogWindowProject {
   path: string;
-  actionType: ActionType;
+  actionType: RunKind;
 }
 
 export interface LogWindowHandle {

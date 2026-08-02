@@ -1,5 +1,7 @@
 export type ActionType = 'pipeline' | 'pdf';
 
+export type RunKind = ActionType | 'analyze';
+
 export interface RegistryEntry {
   name: string;
   path: string;
@@ -9,6 +11,11 @@ export interface RegistryEntry {
 export interface LastCommit {
   date: string;
   message: string;
+}
+
+export interface AnalysisResult {
+  summary: string;
+  analyzedAt: string;
 }
 
 export interface GitStatus {
@@ -33,6 +40,7 @@ export interface ProjectCard {
   action: ActionType | null;
   lastRun: string | null;
   githubUrl: string | null;
+  lastAnalysis: AnalysisResult | null;
 }
 
 export type AddProjectRejectionReason = 'already-registered' | 'name-collision';
@@ -51,5 +59,5 @@ export interface ActionExitedPayload {
 export interface LogExitPayload {
   code: number | null;
   path: string;
-  actionType: ActionType;
+  actionType: RunKind;
 }

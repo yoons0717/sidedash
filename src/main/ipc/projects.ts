@@ -4,6 +4,7 @@ import * as registry from '../lib/registry';
 import { getLastCommit, getGitStatus, getGitHubUrl } from '../lib/scanner';
 import { detectAction } from '../actions/detect';
 import { getLastRun } from '../actions/history';
+import { getLastAnalysis } from '../actions/analysis';
 import type { CanAddProjectResult, ProjectCard } from '../../shared/types';
 
 // registry.add() has no dedup and registry.remove() filters by name, so
@@ -26,9 +27,10 @@ export function canAddProject(
   return { ok: true };
 }
 
-export function getProjectCards(historyFilePath: string): ProjectCard[] {
+export function getProjectCards(historyFilePath: string, analysisFilePath: string): ProjectCard[] {
   return registry.getAll().map(({ name, path: projectPath }) => {
     const lastRun = historyFilePath ? getLastRun(historyFilePath, projectPath) : null;
+    const lastAnalysis = analysisFilePath ? getLastAnalysis(analysisFilePath, projectPath) : null;
     const pathExists = fs.existsSync(projectPath);
     if (!pathExists) {
       return {
@@ -42,6 +44,7 @@ export function getProjectCards(historyFilePath: string): ProjectCard[] {
         action: null,
         lastRun,
         githubUrl: null,
+        lastAnalysis,
       };
     }
 
@@ -59,6 +62,7 @@ export function getProjectCards(historyFilePath: string): ProjectCard[] {
       action: detectAction(projectPath),
       lastRun,
       githubUrl: getGitHubUrl(projectPath),
+      lastAnalysis,
     };
   });
 }
