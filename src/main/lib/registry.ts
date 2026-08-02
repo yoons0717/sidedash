@@ -10,7 +10,14 @@ interface Registry {
 }
 
 function readRegistry(): Registry {
-  return readJsonStore<Registry>(REGISTRY_PATH, { projects: [] });
+  const registry = readJsonStore<Registry>(REGISTRY_PATH, { projects: [] });
+  // A legacy/hand-edited file that parses as valid JSON but doesn't have the
+  // expected shape (e.g. missing `projects`) would otherwise crash every
+  // caller of getAll() with a TypeError on `.map`/`.filter`.
+  if (!Array.isArray(registry.projects)) {
+    return { projects: [] };
+  }
+  return registry;
 }
 
 function writeRegistry(registry: Registry): void {

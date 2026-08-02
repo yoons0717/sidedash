@@ -12,6 +12,18 @@ import { openLogWindow, type LogWindowHandle } from './logwindow';
 import type { AddProjectRejectionReason, ProjectCard, RunActionResult } from '../shared/types';
 import { ACTION_LABELS } from '../shared/types';
 import { formatActionResultMessage } from '../shared/format';
+
+// Without this, an uncaught error inside a synchronous callback that isn't
+// on an ipcMain.handle promise chain (e.g. a disk-write failure inside a
+// child.on('exit') handler) crashes the entire main process — every window,
+// the whole menu bar — instead of just the one action that failed.
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+});
+
 // `?asset` doesn't copy this into `out/` — it resolves to a path relative to
 // the project root (`out/main/../../resources/IconTemplate.png`), relying on
 // `resources/` shipping alongside `out/` in the packaged app (true for the
