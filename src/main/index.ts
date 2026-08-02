@@ -4,7 +4,7 @@ import { app, ipcMain, dialog, shell, Notification } from 'electron';
 import { menubar } from 'menubar';
 import * as registry from './lib/registry';
 import { getProjectCards, canAddProject } from './ipc/projects';
-import { runAction, isRunning, hasRunningActions, killAllRunning, shellQuote } from './actions/run';
+import { runAction, isRunning, hasRunningActions, killAllRunning, shellQuote, warmClaudeBinaryCache } from './actions/run';
 import { recordRun } from './actions/history';
 import { recordAnalysis } from './actions/analysis';
 import { getUncommittedFiles } from './actions/git';
@@ -21,6 +21,11 @@ import iconPath from '../../resources/IconTemplate.png?asset';
 
 const HISTORY_FILE = path.join(app.getPath('userData'), 'last-run.json');
 const ANALYSIS_FILE = path.join(app.getPath('userData'), 'analysis.json');
+
+// Fire-and-forget, resolved well before a user could reach the analyze
+// button — resolving synchronously per-click instead froze the whole app
+// for the duration of the shell probe (see run.ts for why).
+void warmClaudeBinaryCache();
 
 app.dock.hide();
 
@@ -225,6 +230,10 @@ ipcMain.handle('run-analysis', (_event, projectPath: string): RunActionResult =>
 
   const projectWithType = { ...project, actionType: 'analyze' as const };
   const logWindow = openLogWindow(project.name, projectWithType);
+  // claude -p's default text output prints nothing until the final answer
+  // is ready — without this, the log window sits blank for the whole run
+  // (often 30s-2m) and looks frozen rather than working.
+  logWindow.appendData('🔍 분석 중입니다... (완료까지 30초~2분 정도 걸릴 수 있어요)\n\n');
 
   let summary = '';
 

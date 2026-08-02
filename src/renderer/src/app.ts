@@ -364,6 +364,7 @@ function renderCard(project: ProjectCard): HTMLDivElement {
   detail.className = 'card-detail';
   let filesPanel: HTMLDivElement | null = null;
   let detailMainSpan: HTMLSpanElement | null = null;
+  let analysisTextEl: HTMLDivElement | null = null;
 
   if (!project.pathExists) {
     detail.classList.add('missing');
@@ -395,7 +396,13 @@ function renderCard(project: ProjectCard): HTMLDivElement {
     if (project.lastAnalysis) {
       const analysisBox = document.createElement('div');
       analysisBox.className = 'card-analysis';
-      analysisBox.textContent = project.lastAnalysis.summary;
+
+      const analysisText = document.createElement('div');
+      analysisText.className = 'card-analysis-text';
+      analysisText.textContent = project.lastAnalysis.summary;
+      analysisBox.appendChild(analysisText);
+      analysisTextEl = analysisText;
+
       body.appendChild(analysisBox);
     }
 
@@ -431,12 +438,15 @@ function renderCard(project: ProjectCard): HTMLDivElement {
     body.appendChild(filesPanel);
   }
 
-  // Clicking a card toggles its truncated commit message open, and (for
-  // dirty cards) the uncommitted-files panel at the same time.
-  if (detailMainSpan || filesPanel) {
+  // Clicking a card toggles its truncated commit message open, the
+  // uncommitted-files panel, and the analysis summary's clamp — all at once,
+  // for the same reason: each is a "this is truncated for space" affordance
+  // and there's no reason to make the user find a separate toggle per line.
+  if (detailMainSpan || filesPanel || analysisTextEl) {
     card.classList.add('clickable');
     card.addEventListener('click', () => {
       detailMainSpan?.classList.toggle('expanded');
+      analysisTextEl?.classList.toggle('expanded');
       if (filesPanel) {
         toggleFilesPanel(project, filesPanel, card);
       }

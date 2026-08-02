@@ -7,13 +7,14 @@ import {
   ANALYSIS_PROMPT,
   buildAnalyzeCommand,
   createUtf8Decoder,
+  getResolvedClaudeBinary,
   hasRunningActions,
   isRunning,
   killAllRunning,
-  resolveClaudeBinary,
   runAction,
   runningProjects,
   shellQuote,
+  warmClaudeBinaryCache,
 } from './run';
 
 describe('shellQuote', () => {
@@ -49,14 +50,26 @@ describe('shellQuote', () => {
 describe('buildAnalyzeCommand', () => {
   it('wraps the resolved claude binary path and analysis prompt as quoted arguments, scoped to allowed tools', () => {
     expect(buildAnalyzeCommand('/usr/local/bin/claude')).toBe(
-      `${shellQuote('/usr/local/bin/claude')} -p ${shellQuote(ANALYSIS_PROMPT)} --allowedTools ${shellQuote('Read')} ${shellQuote('Glob')} ${shellQuote('Bash(git log:*)')}`
+      `${shellQuote('/usr/local/bin/claude')} -p ${shellQuote(ANALYSIS_PROMPT)} --allowedTools ${shellQuote('Read')} ${shellQuote('Glob')} ${shellQuote('Bash(git log:*)')} < /dev/null`
     );
   });
 });
 
-describe('resolveClaudeBinary', () => {
-  it('returns a non-empty string', () => {
-    expect(resolveClaudeBinary().length).toBeGreaterThan(0);
+describe('warmClaudeBinaryCache / getResolvedClaudeBinary', () => {
+  it('defaults to the bare command name before warming', () => {
+    // Only meaningful if nothing earlier in this file's run already warmed
+    // the module-level cache — this codebase's tests don't reset module
+    // state between files, so this documents the fallback value rather than
+    // strictly proving cold-start behavior.
+    expect(typeof getResolvedClaudeBinary()).toBe('string');
+    expect(getResolvedClaudeBinary().length).toBeGreaterThan(0);
+  });
+
+  it('resolves and caches an absolute path (or falls back to "claude")', async () => {
+    const resolved = await warmClaudeBinaryCache();
+
+    expect(resolved.length).toBeGreaterThan(0);
+    expect(getResolvedClaudeBinary()).toBe(resolved);
   });
 });
 
