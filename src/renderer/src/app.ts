@@ -1,9 +1,5 @@
-import type { ActionExitedPayload, ActionType, ProjectCard } from '../../shared/types';
-
-const ACTION_LABELS: Record<ActionType, string> = {
-  pipeline: '파이프라인 실행',
-  pdf: 'PDF 생성',
-};
+import type { ActionExitedPayload, ActionType, ProjectCard, RunActionResult } from '../../shared/types';
+import { ACTION_LABELS } from '../../shared/types';
 
 const ACTION_ICONS: Record<ActionType, { text: string; className: string }> = {
   pipeline: { text: '>_', className: 'icon-pipeline' },
@@ -41,22 +37,15 @@ function sortProjects(projects: ProjectCard[]): ProjectCard[] {
   return sorted;
 }
 
-function setActionButtonState(actionBtn: HTMLButtonElement, project: ProjectCard): void {
-  const running = runningPaths.has(project.path);
-  actionBtn.disabled = running;
-  actionBtn.classList.toggle('card-action-running', running);
-  actionBtn.textContent = running ? '실행 중…' : ACTION_LABELS[project.action!];
+function analyzeButtonLabel(project: ProjectCard): string {
+  return project.lastAnalysis ? '🔍 다시 분석' : '🔍 상태 분석';
 }
 
-function setAnalyzeButtonState(analyzeBtn: HTMLButtonElement, project: ProjectCard): void {
+function setButtonState(btn: HTMLButtonElement, project: ProjectCard, labelWhenIdle: string): void {
   const running = runningPaths.has(project.path);
-  analyzeBtn.disabled = running;
-  analyzeBtn.classList.toggle('card-action-running', running);
-  analyzeBtn.textContent = running
-    ? '실행 중…'
-    : project.lastAnalysis
-      ? '🔍 다시 분석'
-      : '🔍 상태 분석';
+  btn.disabled = running;
+  btn.classList.toggle('card-action-running', running);
+  btn.textContent = running ? '실행 중…' : labelWhenIdle;
 }
 
 // Both buttons on a card share the same backend busy guard (runningProjects
@@ -73,57 +62,68 @@ function setAnalyzeButtonState(analyzeBtn: HTMLButtonElement, project: ProjectCa
 // call itself rejecting) has no run in flight to fix it later, so it's
 // undone right here — otherwise the button is stuck on "실행 중…" until
 // the app restarts.
-async function handleRunAction(
+async function runProjectAction(
+  project: ProjectCard,
+  primaryBtn: HTMLButtonElement,
+  primaryLabel: string,
+  secondaryBtn: HTMLButtonElement | null,
+  secondaryLabel: string | null,
+  call: () => Promise<RunActionResult>,
+  errorLabel: string
+): Promise<void> {
+  if (runningPaths.has(project.path)) {
+    return;
+  }
+  const setBoth = (): void => {
+    setButtonState(primaryBtn, project, primaryLabel);
+    if (secondaryBtn && secondaryLabel !== null) setButtonState(secondaryBtn, project, secondaryLabel);
+  };
+  runningPaths.add(project.path);
+  setBoth();
+  try {
+    const result = await call();
+    if (result.ok === false && result.reason !== 'already-running') {
+      runningPaths.delete(project.path);
+      setBoth();
+    }
+  } catch (err) {
+    console.error(`${errorLabel} failed:`, err);
+    runningPaths.delete(project.path);
+    setBoth();
+  }
+}
+
+function handleRunAction(
   project: ProjectCard,
   actionBtn: HTMLButtonElement,
   analyzeBtn: HTMLButtonElement | null,
   targetPaths: string[]
 ): Promise<void> {
-  if (runningPaths.has(project.path)) {
-    return;
-  }
-  runningPaths.add(project.path);
-  setActionButtonState(actionBtn, project);
-  if (analyzeBtn) setAnalyzeButtonState(analyzeBtn, project);
-  try {
-    const result = await window.api.runAction(project.path, targetPaths);
-    if (result.ok === false && result.reason !== 'already-running') {
-      runningPaths.delete(project.path);
-      setActionButtonState(actionBtn, project);
-      if (analyzeBtn) setAnalyzeButtonState(analyzeBtn, project);
-    }
-  } catch (err) {
-    console.error('run-action failed:', err);
-    runningPaths.delete(project.path);
-    setActionButtonState(actionBtn, project);
-    if (analyzeBtn) setAnalyzeButtonState(analyzeBtn, project);
-  }
+  return runProjectAction(
+    project,
+    actionBtn,
+    ACTION_LABELS[project.action!],
+    analyzeBtn,
+    analyzeBtn ? analyzeButtonLabel(project) : null,
+    () => window.api.runAction(project.path, targetPaths),
+    'run-action'
+  );
 }
 
-async function handleRunAnalysis(
+function handleRunAnalysis(
   project: ProjectCard,
   analyzeBtn: HTMLButtonElement,
   actionBtn: HTMLButtonElement | null
 ): Promise<void> {
-  if (runningPaths.has(project.path)) {
-    return;
-  }
-  runningPaths.add(project.path);
-  setAnalyzeButtonState(analyzeBtn, project);
-  if (actionBtn) setActionButtonState(actionBtn, project);
-  try {
-    const result = await window.api.runAnalysis(project.path);
-    if (result.ok === false && result.reason !== 'already-running') {
-      runningPaths.delete(project.path);
-      setAnalyzeButtonState(analyzeBtn, project);
-      if (actionBtn) setActionButtonState(actionBtn, project);
-    }
-  } catch (err) {
-    console.error('run-analysis failed:', err);
-    runningPaths.delete(project.path);
-    setAnalyzeButtonState(analyzeBtn, project);
-    if (actionBtn) setActionButtonState(actionBtn, project);
-  }
+  return runProjectAction(
+    project,
+    analyzeBtn,
+    analyzeButtonLabel(project),
+    actionBtn,
+    actionBtn ? ACTION_LABELS[project.action!] : null,
+    () => window.api.runAnalysis(project.path),
+    'run-analysis'
+  );
 }
 
 // A card can have a target-select panel (pipeline action) and a files panel
@@ -325,7 +325,7 @@ function renderCard(project: ProjectCard): HTMLDivElement {
     actionBtn = document.createElement('button');
     actionBtn.className = 'card-action';
     actionBtn.dataset.path = project.path;
-    setActionButtonState(actionBtn, project);
+    setButtonState(actionBtn, project, ACTION_LABELS[project.action]);
     actionBtn.addEventListener('click', (event) => {
       event.stopPropagation();
       if (project.action === 'pipeline') {
@@ -409,7 +409,7 @@ function renderCard(project: ProjectCard): HTMLDivElement {
     analyzeBtn = document.createElement('button');
     analyzeBtn.className = 'card-action card-action-secondary';
     analyzeBtn.dataset.path = project.path;
-    setAnalyzeButtonState(analyzeBtn, project);
+    setButtonState(analyzeBtn, project, analyzeButtonLabel(project));
     analyzeBtn.addEventListener('click', (event) => {
       event.stopPropagation();
       handleRunAnalysis(project, analyzeBtn!, actionBtn);

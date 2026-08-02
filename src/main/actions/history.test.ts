@@ -1,23 +1,13 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { getLastRun, recordRun } from './history';
+import { tempFilePath } from '../test-utils/tempFile';
 
 describe('history', () => {
-  let dir: string | undefined;
+  const historyFileFor = tempFilePath('sidedash-history-', 'last-run.json');
   let historyFile: string;
 
-  afterEach(() => {
-    if (dir) {
-      rmSync(dir, { recursive: true, force: true });
-      dir = undefined;
-    }
-  });
-
   function setup(): void {
-    dir = mkdtempSync(path.join(tmpdir(), 'sidedash-history-'));
-    historyFile = path.join(dir, 'last-run.json');
+    historyFile = historyFileFor();
   }
 
   it('returns null for a project that has never been recorded', () => {

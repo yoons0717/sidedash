@@ -2,6 +2,11 @@ export type ActionType = 'pipeline' | 'pdf';
 
 export type RunKind = ActionType | 'analyze';
 
+export const ACTION_LABELS: Record<ActionType, string> = {
+  pipeline: '파이프라인 실행',
+  pdf: 'PDF 생성',
+};
+
 export interface RegistryEntry {
   name: string;
   path: string;

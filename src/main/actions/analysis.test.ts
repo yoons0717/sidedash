@@ -1,23 +1,13 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { getLastAnalysis, recordAnalysis } from './analysis';
+import { tempFilePath } from '../test-utils/tempFile';
 
 describe('analysis', () => {
-  let dir: string | undefined;
+  const analysisFileFor = tempFilePath('sidedash-analysis-', 'analysis.json');
   let analysisFile: string;
 
-  afterEach(() => {
-    if (dir) {
-      rmSync(dir, { recursive: true, force: true });
-      dir = undefined;
-    }
-  });
-
   function setup(): void {
-    dir = mkdtempSync(path.join(tmpdir(), 'sidedash-analysis-'));
-    analysisFile = path.join(dir, 'analysis.json');
+    analysisFile = analysisFileFor();
   }
 
   it('returns null for a project that has never been analyzed', () => {

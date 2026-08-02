@@ -8,8 +8,10 @@ import { runAction, isRunning, hasRunningActions, killAllRunning, shellQuote, wa
 import { recordRun } from './actions/history';
 import { recordAnalysis } from './actions/analysis';
 import { getUncommittedFiles } from './actions/git';
-import { openLogWindow } from './logwindow';
-import type { ActionType, AddProjectRejectionReason, RunActionResult } from '../shared/types';
+import { openLogWindow, type LogWindowHandle } from './logwindow';
+import type { AddProjectRejectionReason, ProjectCard, RunActionResult } from '../shared/types';
+import { ACTION_LABELS } from '../shared/types';
+import { formatActionResultMessage } from '../shared/format';
 // `?asset` doesn't copy this into `out/` — it resolves to a path relative to
 // the project root (`out/main/../../resources/IconTemplate.png`), relying on
 // `resources/` shipping alongside `out/` in the packaged app (true for the
@@ -158,10 +160,17 @@ ipcMain.handle('quit-app', async () => {
   app.quit();
 });
 
-const ACTION_LABELS: Record<ActionType, string> = {
-  pipeline: '파이프라인 실행',
-  pdf: 'PDF 생성',
-};
+// Shared by run-action/run-analysis's onExit callbacks: both notify the
+// renderer, finish the log window, and fire a completion notification —
+// only the label and (for run-action) the ACTION_LABELS lookup differ.
+function reportActionExit(project: ProjectCard, logWindow: LogWindowHandle, code: number | null, label: string): void {
+  mb.window?.webContents.send('action-exited', { path: project.path, code });
+  logWindow.finish(code);
+
+  const notification = new Notification({ title: project.name, body: formatActionResultMessage(label, code) });
+  notification.on('click', () => logWindow.focus());
+  notification.show();
+}
 
 // Return value lets the renderer tell "genuinely didn't start, re-enable the
 // button now" apart from "already running elsewhere, leave it disabled —
@@ -193,21 +202,10 @@ ipcMain.handle('run-action', (_event, projectPath: string, targetPaths: string[]
     {
       onData: (chunk) => logWindow.appendData(chunk),
       onExit: (code) => {
-        mb.window?.webContents.send('action-exited', { path: project.path, code });
-        logWindow.finish(code);
-
         if (code === 0) {
           recordRun(HISTORY_FILE, project.path);
         }
-
-        const actionLabel = ACTION_LABELS[project.action!];
-        const body =
-          code === 0 ? `${actionLabel} 완료`
-          : code === null ? `${actionLabel} 실패 (프로세스를 시작하지 못함)`
-          : `${actionLabel} 실패 (종료 코드 ${code})`;
-        const notification = new Notification({ title: project.name, body });
-        notification.on('click', () => logWindow.focus());
-        notification.show();
+        reportActionExit(project, logWindow, code, ACTION_LABELS[project.action!]);
       },
     }
   );
@@ -248,27 +246,13 @@ ipcMain.handle('run-analysis', (_event, projectPath: string): RunActionResult =>
         logWindow.appendData(chunk);
       },
       onExit: (code) => {
-        mb.window?.webContents.send('action-exited', { path: project.path, code });
-        logWindow.finish(code);
-
         if (code === 0) {
           recordAnalysis(ANALYSIS_FILE, project.path, summary.trim());
         }
-
-        const body =
-          code === 0 ? `${ANALYSIS_LABEL} 완료`
-          : code === null ? `${ANALYSIS_LABEL} 실패 (프로세스를 시작하지 못함)`
-          : `${ANALYSIS_LABEL} 실패 (종료 코드 ${code})`;
-        const notification = new Notification({ title: project.name, body });
-        notification.on('click', () => logWindow.focus());
-        notification.show();
+        reportActionExit(project, logWindow, code, ANALYSIS_LABEL);
       },
     }
   );
 
   return { ok: true };
-});
-
-mb.on('ready', () => {
-  console.log('sidedash is ready');
 });

@@ -1,3 +1,5 @@
+import { formatExitReason } from '../../shared/format';
+
 const logEl = document.getElementById('log')!;
 const statusEl = document.getElementById('status')!;
 
@@ -34,6 +36,6 @@ window.logApi.onLogExit(({ code, path, actionType }) => {
     }
   } else {
     statusEl.className = 'failure';
-    statusEl.textContent = code === null ? '실패 (프로세스를 시작하지 못함)' : `실패 (종료 코드 ${code})`;
+    statusEl.textContent = `실패 (${formatExitReason(code)})`;
   }
 });

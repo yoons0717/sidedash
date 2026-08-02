@@ -1,29 +1,20 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import type { RegistryEntry } from '../../shared/types';
+import { readJsonStore, writeJsonStore } from './jsonStore';
 
-const REGISTRY_DIR = path.join(os.homedir(), '.pj');
-const REGISTRY_PATH = path.join(REGISTRY_DIR, 'registry.json');
+const REGISTRY_PATH = path.join(os.homedir(), '.pj', 'registry.json');
 
 interface Registry {
   projects: RegistryEntry[];
 }
 
 function readRegistry(): Registry {
-  if (!fs.existsSync(REGISTRY_PATH)) {
-    return { projects: [] };
-  }
-  try {
-    return JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf-8'));
-  } catch {
-    return { projects: [] };
-  }
+  return readJsonStore<Registry>(REGISTRY_PATH, { projects: [] });
 }
 
 function writeRegistry(registry: Registry): void {
-  fs.mkdirSync(REGISTRY_DIR, { recursive: true });
-  fs.writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2));
+  writeJsonStore(REGISTRY_PATH, registry);
 }
 
 export function getAll(): RegistryEntry[] {
