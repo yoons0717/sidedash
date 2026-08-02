@@ -25,10 +25,15 @@ export const ANALYSIS_PROMPT =
 // `claude` resolves under `npm run dev` (inherits the terminal's PATH) but
 // silently fails in the packaged app. Resolving via an interactive login
 // shell once, up front, sources ~/.zshrc the same way a real terminal does.
+// `-i` has no controlling TTY here (Electron's main process), so a stalled
+// shell-startup hook could otherwise block forever — the timeout turns that
+// into the same graceful bare-'claude' fallback as any other resolution
+// failure, instead of freezing the whole app.
 export function resolveClaudeBinary(): string {
   try {
     const resolved = execFileSync('/bin/zsh', ['-ilc', 'command -v claude'], {
       encoding: 'utf8',
+      timeout: 3000,
     }).trim();
     return resolved || 'claude';
   } catch {
