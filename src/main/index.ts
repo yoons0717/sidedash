@@ -13,6 +13,14 @@ import type { AddProjectRejectionReason, ProjectCard, RunActionResult } from '..
 import { ACTION_LABELS } from '../shared/types';
 import { formatActionResultMessage } from '../shared/format';
 
+// Two instances would otherwise both read-modify-write registry.json/
+// last-run.json/analysis.json with no OS-level locking between them —
+// possible in practice since the login item can auto-launch one while the
+// user double-clicks the .app themselves.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+}
+
 // Without this, an uncaught error inside a synchronous callback that isn't
 // on an ipcMain.handle promise chain (e.g. a disk-write failure inside a
 // child.on('exit') handler) crashes the entire main process — every window,
@@ -175,7 +183,7 @@ ipcMain.handle('quit-app', async () => {
     if (result.response !== 0) {
       return;
     }
-    killAllRunning();
+    await killAllRunning();
   }
   app.quit();
 });
@@ -238,7 +246,7 @@ const ANALYSIS_LABEL = '상태 분석';
 ipcMain.handle('run-analysis', (_event, projectPath: string): RunActionResult => {
   const cards = getProjectCards(HISTORY_FILE, ANALYSIS_FILE);
   const project = cards.find((p) => p.path === projectPath);
-  if (!project) {
+  if (!project || !project.pathExists) {
     return { ok: false, reason: 'invalid' };
   }
 

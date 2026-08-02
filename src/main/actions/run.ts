@@ -86,19 +86,60 @@ export function hasRunningActions(): boolean {
   return runningProjects.size > 0;
 }
 
+const KILL_GRACE_PERIOD_MS = 2000;
+
 // Kills each tracked action's whole process tree (the login shell plus
 // anything it forked — python3, node, a Chromium instance, etc.), not just
 // the immediate spawned shell. Requires runAction to spawn with
 // `detached: true`, which makes the child the leader of its own process
 // group; signalling the negative pid targets that entire group.
-export function killAllRunning(): void {
-  for (const child of runningProjects.values()) {
+//
+// Waits for exit (or a grace period) before resolving, escalating to
+// SIGKILL for anything that ignored SIGTERM — otherwise a caller that quits
+// the app immediately after calling this (see index.ts's quit-app handler)
+// can leave orphaned processes behind once the app itself is gone.
+export function killAllRunning(): Promise<void> {
+  const children = [...runningProjects.values()];
+  for (const child of children) {
     try {
       process.kill(-child.pid!, 'SIGTERM');
     } catch {
       // Process group may already be gone — nothing left to kill.
     }
   }
+
+  const stillAlive = (child: ChildProcess): boolean => child.exitCode === null && child.signalCode === null;
+
+  return new Promise((resolve) => {
+    if (!children.some(stillAlive)) {
+      resolve();
+      return;
+    }
+
+    let remaining = children.filter(stillAlive).length;
+    const timeout = setTimeout(() => {
+      for (const child of children) {
+        if (stillAlive(child)) {
+          try {
+            process.kill(-child.pid!, 'SIGKILL');
+          } catch {
+            // Already gone.
+          }
+        }
+      }
+      resolve();
+    }, KILL_GRACE_PERIOD_MS);
+
+    for (const child of children) {
+      child.once('exit', () => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearTimeout(timeout);
+          resolve();
+        }
+      });
+    }
+  });
 }
 
 export function runAction(
@@ -131,12 +172,33 @@ export function runAction(
   child.stdout!.on('data', (chunk) => onData?.(decodeStdout(chunk), 'stdout'));
   child.stderr!.on('data', (chunk) => onData?.(decodeStderr(chunk), 'stderr'));
 
+  // Unlike run.sh/npm scripts (the user's own, potentially long-running
+  // scripts), a hung `claude -p` call has no legitimate reason to run this
+  // long — without this, a stalled analysis leaves the project stuck
+  // "실행 중…" forever with no way to recover short of quitting the app.
+  const analyzeTimeout =
+    project.actionType === 'analyze'
+      ? setTimeout(
+          () => {
+            onData?.('\n분석이 너무 오래 걸려 중단합니다 (10분 초과).\n', 'stderr');
+            try {
+              process.kill(-child.pid!, 'SIGTERM');
+            } catch {
+              // Already gone.
+            }
+          },
+          10 * 60 * 1000
+        )
+      : undefined;
+
   child.on('exit', (code) => {
+    if (analyzeTimeout) clearTimeout(analyzeTimeout);
     runningProjects.delete(project.path);
     onExit?.(code);
   });
 
   child.on('error', (err) => {
+    if (analyzeTimeout) clearTimeout(analyzeTimeout);
     runningProjects.delete(project.path);
     onData?.(`명령을 실행할 수 없습니다: ${err.message}\n`, 'stderr');
     onExit?.(null);
