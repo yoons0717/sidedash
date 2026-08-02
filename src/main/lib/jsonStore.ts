@@ -7,7 +7,11 @@ export function readJsonStore<T>(filePath: string, defaultValue: T): T {
   }
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  } catch {
+  } catch (err) {
+    // The file exists but isn't valid JSON (truncated write, manual edit
+    // gone wrong) — distinct from "never created yet", and worth knowing
+    // about since the next write silently overwrites it with the default.
+    console.error(`Failed to parse JSON store at ${filePath}, falling back to default:`, err);
     return defaultValue;
   }
 }

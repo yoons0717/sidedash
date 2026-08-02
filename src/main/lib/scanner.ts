@@ -18,9 +18,14 @@ export function getPackageScripts(projectPath: string): Record<string, string> {
   try {
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
     return pkg.scripts ?? {};
-  } catch {
+  } catch (err) {
+    console.error(`Failed to parse ${pkgPath}:`, err);
     return {};
   }
+}
+
+function hasGitDir(projectPath: string): boolean {
+  return fs.existsSync(path.join(projectPath, '.git'));
 }
 
 export function getLastCommit(projectPath: string): LastCommit | null {
@@ -58,7 +63,13 @@ export function getGitStatus(projectPath: string): GitStatus | null {
       hasUncommittedChanges: changedFileCount > 0,
       changedFileCount,
     };
-  } catch {
+  } catch (err) {
+    // `status --porcelain` essentially never fails for an intact repo, so a
+    // failure here while .git actually exists is worth surfacing — unlike
+    // the branch lookup above, which fails routinely (detached HEAD).
+    if (hasGitDir(projectPath)) {
+      console.error(`git status failed for ${projectPath}:`, err);
+    }
     return null;
   }
 }

@@ -1,4 +1,6 @@
 import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { UncommittedFile } from '../../shared/types';
 
 export function getUncommittedFiles(projectPath: string): UncommittedFile[] {
@@ -19,7 +21,13 @@ export function getUncommittedFiles(projectPath: string): UncommittedFile[] {
         status: line.slice(0, 2).trim(),
         file: line.slice(3),
       }));
-  } catch {
+  } catch (err) {
+    // `status --porcelain` essentially never fails for an intact repo, so a
+    // failure while .git actually exists is worth surfacing rather than
+    // silently looking identical to "0 uncommitted files".
+    if (fs.existsSync(path.join(projectPath, '.git'))) {
+      console.error(`git status failed for ${projectPath}:`, err);
+    }
     return [];
   }
 }

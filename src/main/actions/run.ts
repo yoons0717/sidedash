@@ -47,8 +47,11 @@ export function warmClaudeBinaryCache(): Promise<string> {
       '/bin/zsh',
       ['-ilc', 'command -v claude'],
       { encoding: 'utf8', timeout: 3000 },
-      (_error, stdout) => {
+      (error, stdout) => {
         const resolved = stdout?.trim();
+        if (!resolved && error) {
+          console.error('Failed to resolve claude binary path:', error);
+        }
         cachedClaudeBinary = resolved || 'claude';
         resolve(cachedClaudeBinary);
       }
