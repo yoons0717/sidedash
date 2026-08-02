@@ -13,6 +13,7 @@ let sortMode: 'recent' | 'name' = 'recent';
 
 function formatRelativeTime(isoString: string, now = new Date()): string {
   const diffMs = now.getTime() - new Date(isoString).getTime();
+  if (Number.isNaN(diffMs)) return '알 수 없음';
   const minutes = Math.floor(diffMs / 60000);
   if (minutes < 1) return '방금 전';
   if (minutes < 60) return `${minutes}분 전`;
@@ -477,6 +478,15 @@ function renderProjects(projects: ProjectCard[]): void {
   currentProjects = projects;
   countEl.textContent = String(projects.length);
   listEl.innerHTML = '';
+
+  if (projects.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.textContent = '등록된 프로젝트가 없어요. 위 + 버튼으로 추가해보세요.';
+    listEl.appendChild(empty);
+    return;
+  }
+
   const sorted = sortProjects(projects);
   sorted.forEach((project, index) => {
     listEl.appendChild(renderCard(project));
@@ -504,12 +514,18 @@ async function handleRemove(name: string): Promise<void> {
   }
 }
 
+let addInFlight = false;
+
 async function handleAdd(): Promise<void> {
+  if (addInFlight) return;
+  addInFlight = true;
   try {
     const projects = await window.api.addProject();
     renderProjects(projects);
   } catch (err) {
     console.error('add-project failed:', err);
+  } finally {
+    addInFlight = false;
   }
 }
 

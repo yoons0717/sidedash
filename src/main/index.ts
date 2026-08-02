@@ -274,7 +274,9 @@ ipcMain.handle('run-analysis', (_event, projectPath: string): RunActionResult =>
         logWindow.appendData(chunk);
       },
       onExit: (code) => {
-        if (code === 0) {
+        // An empty summary (claude -p exiting 0 with no stdout) shouldn't
+        // overwrite a real prior analysis with a blank "완료" box.
+        if (code === 0 && summary.trim()) {
           recordAnalysis(ANALYSIS_FILE, project.path, summary.trim());
         }
         reportActionExit(project, logWindow, code, ANALYSIS_LABEL);
