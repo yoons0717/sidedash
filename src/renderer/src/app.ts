@@ -48,15 +48,6 @@ function setActionButtonState(actionBtn: HTMLButtonElement, project: ProjectCard
   actionBtn.textContent = running ? '실행 중…' : ACTION_LABELS[project.action!];
 }
 
-// Marks the button running optimistically, before run-action resolves —
-// so it needs to be undone whenever the call turns out not to have actually
-// started anything. "already-running" is the one exception: that means a
-// real run *is* in progress (started by an earlier, still-in-flight click),
-// so the button stays disabled and self-clears when that run's own
-// action-exited arrives. Every other case (invalid project, or the IPC
-// call itself rejecting) has no run in flight to fix it later, so it's
-// undone right here — otherwise the button is stuck on "실행 중…" until
-// the app restarts.
 function setAnalyzeButtonState(analyzeBtn: HTMLButtonElement, project: ProjectCard): void {
   const running = runningPaths.has(project.path);
   analyzeBtn.disabled = running;
@@ -72,6 +63,16 @@ function setAnalyzeButtonState(analyzeBtn: HTMLButtonElement, project: ProjectCa
 // is keyed by path only, not by action), so starting either one must also
 // visually disable the other immediately — otherwise the sibling button
 // stays clickable until the next full refreshProjects() re-render.
+//
+// Marks the button running optimistically, before run-action resolves —
+// so it needs to be undone whenever the call turns out not to have actually
+// started anything. "already-running" is the one exception: that means a
+// real run *is* in progress (started by an earlier, still-in-flight click),
+// so the button stays disabled and self-clears when that run's own
+// action-exited arrives. Every other case (invalid project, or the IPC
+// call itself rejecting) has no run in flight to fix it later, so it's
+// undone right here — otherwise the button is stuck on "실행 중…" until
+// the app restarts.
 async function handleRunAction(
   project: ProjectCard,
   actionBtn: HTMLButtonElement,
@@ -338,15 +339,6 @@ function renderCard(project: ProjectCard): HTMLDivElement {
     header.appendChild(actionBtn);
   }
 
-  if (project.pathExists) {
-    const analysisTag = document.createElement('span');
-    analysisTag.className = 'card-analysis-tag' + (project.lastAnalysis ? ' done' : '');
-    analysisTag.textContent = project.lastAnalysis
-      ? `${formatRelativeTime(project.lastAnalysis.analyzedAt)} 분석`
-      : '미분석';
-    header.appendChild(analysisTag);
-  }
-
   const removeBtn = document.createElement('button');
   removeBtn.className = 'card-remove';
   removeBtn.textContent = '✕';
@@ -416,9 +408,16 @@ function renderCard(project: ProjectCard): HTMLDivElement {
       handleRunAnalysis(project, analyzeBtn!, actionBtn);
     });
 
+    const analysisTag = document.createElement('span');
+    analysisTag.className = 'card-analysis-tag' + (project.lastAnalysis ? ' done' : '');
+    analysisTag.textContent = project.lastAnalysis
+      ? `${formatRelativeTime(project.lastAnalysis.analyzedAt)} 분석`
+      : '미분석';
+
     const analyzeRow = document.createElement('div');
     analyzeRow.className = 'card-analyze-row';
     analyzeRow.appendChild(analyzeBtn);
+    analyzeRow.appendChild(analysisTag);
     body.appendChild(analyzeRow);
   }
 

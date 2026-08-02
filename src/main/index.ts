@@ -232,8 +232,10 @@ ipcMain.handle('run-analysis', (_event, projectPath: string): RunActionResult =>
     projectWithType,
     [],
     {
-      onData: (chunk) => {
-        summary += chunk;
+      onData: (chunk, stream) => {
+        if (stream === 'stdout') {
+          summary += chunk;
+        }
         logWindow.appendData(chunk);
       },
       onExit: (code) => {

@@ -10,6 +10,7 @@ import {
   hasRunningActions,
   isRunning,
   killAllRunning,
+  resolveClaudeBinary,
   runAction,
   runningProjects,
   shellQuote,
@@ -46,8 +47,16 @@ describe('shellQuote', () => {
 });
 
 describe('buildAnalyzeCommand', () => {
-  it('wraps the analysis prompt as a single quoted argument to claude -p', () => {
-    expect(buildAnalyzeCommand()).toBe(`claude -p ${shellQuote(ANALYSIS_PROMPT)}`);
+  it('wraps the resolved claude binary path and analysis prompt as quoted arguments, scoped to allowed tools', () => {
+    expect(buildAnalyzeCommand('/usr/local/bin/claude')).toBe(
+      `${shellQuote('/usr/local/bin/claude')} -p ${shellQuote(ANALYSIS_PROMPT)} --allowedTools ${shellQuote('Read')} ${shellQuote('Glob')} ${shellQuote('Bash(git log:*)')}`
+    );
+  });
+});
+
+describe('resolveClaudeBinary', () => {
+  it('returns a non-empty string', () => {
+    expect(resolveClaudeBinary().length).toBeGreaterThan(0);
   });
 });
 

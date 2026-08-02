@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 import type { RunKind } from '../../shared/types';
 
@@ -8,7 +8,7 @@ export interface RunnableProject {
 }
 
 export interface RunActionCallbacks {
-  onData?: (chunk: string) => void;
+  onData?: (chunk: string, stream: 'stdout' | 'stderr') => void;
   onExit?: (code: number | null) => void;
 }
 
@@ -19,8 +19,25 @@ export function shellQuote(str: string): string {
 export const ANALYSIS_PROMPT =
   '이 프로젝트의 README, 최근 git 커밋 로그, 소스 파일 구조를 읽고, 지금 이 프로젝트가 어디까지 완성됐고 어디서 작업이 멈췄는지를 2~3문장의 평문으로 요약해줘. 마크다운 형식이나 글머리 기호는 쓰지 말고, 완성도를 숫자나 퍼센트로 매기지 말고, 이 프로젝트를 계속하는 게 좋을지 말지는 추천하지 마.';
 
-export function buildAnalyzeCommand(): string {
-  return `claude -p ${shellQuote(ANALYSIS_PROMPT)}`;
+// Login items run under launchd's minimal environment, which sources only
+// ~/.zshenv/.zprofile/.zlogin (none of which exist on this machine) — never
+// ~/.zshrc, where PATH additions (nvm, ~/.local/bin) actually live. A bare
+// `claude` resolves under `npm run dev` (inherits the terminal's PATH) but
+// silently fails in the packaged app. Resolving via an interactive login
+// shell once, up front, sources ~/.zshrc the same way a real terminal does.
+export function resolveClaudeBinary(): string {
+  try {
+    const resolved = execFileSync('/bin/zsh', ['-ilc', 'command -v claude'], {
+      encoding: 'utf8',
+    }).trim();
+    return resolved || 'claude';
+  } catch {
+    return 'claude';
+  }
+}
+
+export function buildAnalyzeCommand(claudeBinary: string): string {
+  return `${shellQuote(claudeBinary)} -p ${shellQuote(ANALYSIS_PROMPT)} --allowedTools ${shellQuote('Read')} ${shellQuote('Glob')} ${shellQuote('Bash(git log:*)')}`;
 }
 
 export function createUtf8Decoder(): (chunk: Buffer) => string {
@@ -69,7 +86,7 @@ export function runAction(
   } else if (project.actionType === 'pdf') {
     command = 'npm run pdf';
   } else if (project.actionType === 'analyze') {
-    command = buildAnalyzeCommand();
+    command = buildAnalyzeCommand(resolveClaudeBinary());
   } else {
     return;
   }
@@ -80,8 +97,8 @@ export function runAction(
   const decodeStdout = createUtf8Decoder();
   const decodeStderr = createUtf8Decoder();
 
-  child.stdout!.on('data', (chunk) => onData?.(decodeStdout(chunk)));
-  child.stderr!.on('data', (chunk) => onData?.(decodeStderr(chunk)));
+  child.stdout!.on('data', (chunk) => onData?.(decodeStdout(chunk), 'stdout'));
+  child.stderr!.on('data', (chunk) => onData?.(decodeStderr(chunk), 'stderr'));
 
   child.on('exit', (code) => {
     runningProjects.delete(project.path);
@@ -90,7 +107,7 @@ export function runAction(
 
   child.on('error', (err) => {
     runningProjects.delete(project.path);
-    onData?.(`명령을 실행할 수 없습니다: ${err.message}\n`);
+    onData?.(`명령을 실행할 수 없습니다: ${err.message}\n`, 'stderr');
     onExit?.(null);
   });
 }
