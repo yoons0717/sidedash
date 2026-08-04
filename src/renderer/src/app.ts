@@ -38,9 +38,7 @@ function sortProjects(projects: ProjectCard[]): ProjectCard[] {
   return sorted;
 }
 
-function analyzeButtonLabel(project: ProjectCard): string {
-  return project.lastAnalysis ? '🔍 다시 분석' : '🔍 상태 분석';
-}
+const ANALYZE_BUTTON_LABEL = '🔍 상태 점검';
 
 function setButtonState(btn: HTMLButtonElement, project: ProjectCard, labelWhenIdle: string): void {
   const running = runningPaths.has(project.path);
@@ -105,7 +103,7 @@ function handleRunAction(
     actionBtn,
     ACTION_LABELS[project.action!],
     analyzeBtn,
-    analyzeBtn ? analyzeButtonLabel(project) : null,
+    analyzeBtn ? ANALYZE_BUTTON_LABEL : null,
     () => window.api.runAction(project.path, targetPaths),
     'run-action'
   );
@@ -119,7 +117,7 @@ function handleRunAnalysis(
   return runProjectAction(
     project,
     analyzeBtn,
-    analyzeButtonLabel(project),
+    ANALYZE_BUTTON_LABEL,
     actionBtn,
     actionBtn ? ACTION_LABELS[project.action!] : null,
     () => window.api.runAnalysis(project.path),
@@ -365,7 +363,6 @@ function renderCard(project: ProjectCard): HTMLDivElement {
   detail.className = 'card-detail';
   let filesPanel: HTMLDivElement | null = null;
   let detailMainSpan: HTMLSpanElement | null = null;
-  let analysisTextEl: HTMLDivElement | null = null;
 
   if (!project.pathExists) {
     detail.classList.add('missing');
@@ -394,38 +391,18 @@ function renderCard(project: ProjectCard): HTMLDivElement {
   body.appendChild(detail);
 
   if (project.pathExists) {
-    if (project.lastAnalysis) {
-      const analysisBox = document.createElement('div');
-      analysisBox.className = 'card-analysis';
-
-      const analysisText = document.createElement('div');
-      analysisText.className = 'card-analysis-text';
-      analysisText.textContent = project.lastAnalysis.summary;
-      analysisBox.appendChild(analysisText);
-      analysisTextEl = analysisText;
-
-      body.appendChild(analysisBox);
-    }
-
     analyzeBtn = document.createElement('button');
     analyzeBtn.className = 'card-action card-action-secondary';
     analyzeBtn.dataset.path = project.path;
-    setButtonState(analyzeBtn, project, analyzeButtonLabel(project));
+    setButtonState(analyzeBtn, project, ANALYZE_BUTTON_LABEL);
     analyzeBtn.addEventListener('click', (event) => {
       event.stopPropagation();
       handleRunAnalysis(project, analyzeBtn!, actionBtn);
     });
 
-    const analysisTag = document.createElement('span');
-    analysisTag.className = 'card-analysis-tag' + (project.lastAnalysis ? ' done' : '');
-    analysisTag.textContent = project.lastAnalysis
-      ? `${formatRelativeTime(project.lastAnalysis.analyzedAt)} 분석`
-      : '미분석';
-
     const analyzeRow = document.createElement('div');
     analyzeRow.className = 'card-analyze-row';
     analyzeRow.appendChild(analyzeBtn);
-    analyzeRow.appendChild(analysisTag);
     body.appendChild(analyzeRow);
   }
 
@@ -439,15 +416,14 @@ function renderCard(project: ProjectCard): HTMLDivElement {
     body.appendChild(filesPanel);
   }
 
-  // Clicking a card toggles its truncated commit message open, the
-  // uncommitted-files panel, and the analysis summary's clamp — all at once,
-  // for the same reason: each is a "this is truncated for space" affordance
-  // and there's no reason to make the user find a separate toggle per line.
-  if (detailMainSpan || filesPanel || analysisTextEl) {
+  // Clicking a card toggles its truncated commit message open and the
+  // uncommitted-files panel at once, for the same reason: each is a "this is
+  // truncated for space" affordance and there's no reason to make the user
+  // find a separate toggle per line.
+  if (detailMainSpan || filesPanel) {
     card.classList.add('clickable');
     card.addEventListener('click', () => {
       detailMainSpan?.classList.toggle('expanded');
-      analysisTextEl?.classList.toggle('expanded');
       if (filesPanel) {
         toggleFilesPanel(project, filesPanel, card);
       }
@@ -547,6 +523,9 @@ async function handleActionExited({ path }: ActionExitedPayload): Promise<void> 
 }
 
 async function init(): Promise<void> {
+  if (import.meta.env.DEV) {
+    document.getElementById('dev-badge')!.textContent = 'dev';
+  }
   document.getElementById('add-project')!.addEventListener('click', handleAdd);
   document.getElementById('quit-app')!.addEventListener('click', () => {
     window.api.quitApp().catch((err) => console.error('quit-app failed:', err));

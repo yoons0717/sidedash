@@ -4,9 +4,16 @@ import { app, ipcMain, dialog, shell, Notification } from 'electron';
 import { menubar } from 'menubar';
 import * as registry from './lib/registry';
 import { getProjectCards, canAddProject } from './ipc/projects';
-import { runAction, isRunning, hasRunningActions, killAllRunning, shellQuote, warmClaudeBinaryCache } from './actions/run';
+import {
+  runAction,
+  isRunning,
+  hasRunningActions,
+  killAllRunning,
+  shellQuote,
+  warmClaudeBinaryCache,
+  ANALYSIS_CRITERIA,
+} from './actions/run';
 import { recordRun } from './actions/history';
-import { recordAnalysis } from './actions/analysis';
 import { getUncommittedFiles } from './actions/git';
 import { openLogWindow, type LogWindowHandle } from './logwindow';
 import type { AddProjectRejectionReason, ProjectCard, RunActionResult } from '../shared/types';
@@ -14,9 +21,9 @@ import { ACTION_LABELS } from '../shared/types';
 import { formatActionResultMessage } from '../shared/format';
 
 // Two instances would otherwise both read-modify-write registry.json/
-// last-run.json/analysis.json with no OS-level locking between them —
-// possible in practice since the login item can auto-launch one while the
-// user double-clicks the .app themselves.
+// last-run.json with no OS-level locking between them — possible in
+// practice since the login item can auto-launch one while the user
+// double-clicks the .app themselves.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 }
@@ -42,7 +49,6 @@ process.on('unhandledRejection', (reason) => {
 import iconPath from '../../resources/IconTemplate.png?asset';
 
 const HISTORY_FILE = path.join(app.getPath('userData'), 'last-run.json');
-const ANALYSIS_FILE = path.join(app.getPath('userData'), 'analysis.json');
 
 // Fire-and-forget, resolved well before a user could reach the analyze
 // button — resolving synchronously per-click instead froze the whole app
@@ -79,7 +85,7 @@ const mb = menubar({
   },
 });
 
-ipcMain.handle('get-project-cards', () => getProjectCards(HISTORY_FILE, ANALYSIS_FILE));
+ipcMain.handle('get-project-cards', () => getProjectCards(HISTORY_FILE));
 
 const ADD_REJECTION_MESSAGES: Record<AddProjectRejectionReason, string> = {
   'already-registered': '이미 등록된 프로젝트입니다.',
@@ -96,7 +102,7 @@ ipcMain.handle('add-project', async () => {
     const check = canAddProject(projectPath, registry.getAll());
     if (!check.ok) {
       await dialog.showMessageBox(mb.window!, { type: 'warning', message: ADD_REJECTION_MESSAGES[check.reason] });
-      return getProjectCards(HISTORY_FILE, ANALYSIS_FILE);
+      return getProjectCards(HISTORY_FILE);
     }
     const name = path.basename(projectPath);
     try {
@@ -105,7 +111,7 @@ ipcMain.handle('add-project', async () => {
       dialog.showErrorBox('프로젝트를 추가할 수 없습니다', err instanceof Error ? err.message : String(err));
     }
   }
-  return getProjectCards(HISTORY_FILE, ANALYSIS_FILE);
+  return getProjectCards(HISTORY_FILE);
 });
 
 ipcMain.handle('remove-project', (_event, name: string) => {
@@ -114,7 +120,7 @@ ipcMain.handle('remove-project', (_event, name: string) => {
   } catch (err) {
     dialog.showErrorBox('프로젝트를 삭제할 수 없습니다', err instanceof Error ? err.message : String(err));
   }
-  return getProjectCards(HISTORY_FILE, ANALYSIS_FILE);
+  return getProjectCards(HISTORY_FILE);
 });
 
 ipcMain.handle('open-external', (_event, url: string) => shell.openExternal(url));
@@ -208,7 +214,7 @@ function reportActionExit(project: ProjectCard, logWindow: LogWindowHandle, code
 // nothing ever un-marks it for the "didn't start" case since no run started
 // to eventually fire action-exited.
 ipcMain.handle('run-action', (_event, projectPath: string, targetPaths: string[]): RunActionResult => {
-  const cards = getProjectCards(HISTORY_FILE, ANALYSIS_FILE);
+  const cards = getProjectCards(HISTORY_FILE);
   const project = cards.find((p) => p.path === projectPath);
   if (!project || !project.action) {
     return { ok: false, reason: 'invalid' };
@@ -222,7 +228,7 @@ ipcMain.handle('run-action', (_event, projectPath: string, targetPaths: string[]
   }
 
   const projectWithType = { ...project, actionType: project.action };
-  const logWindow = openLogWindow(project.name, projectWithType);
+  const logWindow = openLogWindow(`${project.name} · ${ACTION_LABELS[project.action]}`, projectWithType);
 
   runAction(
     projectWithType,
@@ -241,10 +247,10 @@ ipcMain.handle('run-action', (_event, projectPath: string, targetPaths: string[]
   return { ok: true };
 });
 
-const ANALYSIS_LABEL = '상태 분석';
+const ANALYSIS_LABEL = '상태 점검';
 
 ipcMain.handle('run-analysis', (_event, projectPath: string): RunActionResult => {
-  const cards = getProjectCards(HISTORY_FILE, ANALYSIS_FILE);
+  const cards = getProjectCards(HISTORY_FILE);
   const project = cards.find((p) => p.path === projectPath);
   if (!project || !project.pathExists) {
     return { ok: false, reason: 'invalid' };
@@ -255,30 +261,20 @@ ipcMain.handle('run-analysis', (_event, projectPath: string): RunActionResult =>
   }
 
   const projectWithType = { ...project, actionType: 'analyze' as const };
-  const logWindow = openLogWindow(project.name, projectWithType);
+  const logWindow = openLogWindow(`${project.name} · ${ANALYSIS_LABEL}`, projectWithType);
   // claude -p's default text output prints nothing until the final answer
   // is ready — without this, the log window sits blank for the whole run
   // (often 30s-2m) and looks frozen rather than working.
-  logWindow.appendData('🔍 분석 중입니다... (완료까지 30초~2분 정도 걸릴 수 있어요)\n\n');
-
-  let summary = '';
+  logWindow.appendData(
+    `🔍 점검 중입니다... (완료까지 30초~2분 정도 걸릴 수 있어요)\n\n평가 기준\n${ANALYSIS_CRITERIA}\n\n`
+  );
 
   runAction(
     projectWithType,
     [],
     {
-      onData: (chunk, stream) => {
-        if (stream === 'stdout') {
-          summary += chunk;
-        }
-        logWindow.appendData(chunk);
-      },
+      onData: (chunk) => logWindow.appendData(chunk),
       onExit: (code) => {
-        // An empty summary (claude -p exiting 0 with no stdout) shouldn't
-        // overwrite a real prior analysis with a blank "완료" box.
-        if (code === 0 && summary.trim()) {
-          recordAnalysis(ANALYSIS_FILE, project.path, summary.trim());
-        }
         reportActionExit(project, logWindow, code, ANALYSIS_LABEL);
       },
     }

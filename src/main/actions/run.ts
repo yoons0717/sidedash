@@ -16,14 +16,14 @@ export function shellQuote(str: string): string {
   return `'${str.replace(/'/g, `'\\''`)}'`;
 }
 
-// Iterated twice on real output before landing here: "정확히 2문장"만 시켰더니
-// 모든 디테일(파일명, 커밋 해시, 스크립트 이름)을 욱여넣은 만연체 두 문장이 나왔고,
-// "80자, 디테일 다 빼라"로 조이니 이번엔 핵심 기능·진행상황까지 같이 날아가서 너무
-// 뭉뚱그려졌다. 실제로 필요한 건 "저수준 기술 디테일(해시/경로/스크립트명)만 빼고,
-// 기능·진행상황 같은 알맹이는 구체적으로" — 길이 제한은 그 알맹이가 들어갈 여유를
-// 남긴 값으로 완화했다.
+// Shared with index.ts, which prints this in the log window before the
+// result streams in — so the score has visible criteria to be read against,
+// instead of landing as a bare, unexplained number.
+export const ANALYSIS_CRITERIA =
+  '0~25: 뼈대만 있음 — 핵심 플로우가 끝까지 이어지지 않음\n26~50: 핵심 플로우 일부는 동작하지만 중간에 끊기거나 미구현된 지점이 있음\n51~75: 핵심 플로우는 처음부터 끝까지 동작하지만 에러 처리나 엣지케이스가 미흡함\n76~100: 핵심 플로우와 에러 처리까지 되어 있어 지금 상태로 계속 써도 무리 없음';
+
 export const ANALYSIS_PROMPT =
-  '이 프로젝트의 최근 git 커밋 로그와 소스 파일 구조를 읽고, 가장 최근에 어떤 작업을 하다가 어디서 멈췄는지만 요약해줘. 프로젝트가 전체적으로 뭘 하는 앱인지 설명하거나 예전 작업 히스토리를 정리하지 말고, 최근 상태에만 집중할 것. 확인했다는 말이나 서론 없이 바로 시작할 것. 2~3문장, 전체 150자 안팎으로 쓸 것. 어떤 기능을 다루고 있었는지는 구체적으로 말하되, 커밋 해시나 파일 경로, 스크립트 이름 같은 지엽적인 기술 디테일만 빼고 말할 것. 마크다운 형식이나 글머리 기호는 쓰지 말고, 완성도를 숫자나 퍼센트로 매기지 말고, 이 프로젝트를 계속하는 게 좋을지 말지는 추천하지 마.';
+  `이 프로젝트의 최근 git 커밋 로그와 소스 파일 구조를 읽고, 핵심 플로우가 어디까지 동작하는지 판단해서 아래 기준으로 완성도 점수를 매기고 다음에 할 일을 제안해줘.\n\n${ANALYSIS_CRITERIA}\n\n프로젝트 전체가 뭘 하는 앱인지 설명하거나 예전 작업 히스토리를 정리하지 말고, 지금 상태만 보고 판단할 것. 다음 할 일은 어떤 기능을 다뤄야 하는지 구체적으로 말하되 커밋 해시나 파일 경로, 스크립트 이름 같은 지엽적인 디테일은 빼고 말할 것. 확인했다는 말이나 서론 없이, 마크다운이나 글머리 기호 없이, 아래 두 줄 형식으로만 답할 것:\n\n완성도: {점수}%\n다음: {한 문장}`;
 
 // Login items run under launchd's minimal environment, which sources only
 // ~/.zshenv/.zprofile/.zlogin (none of which exist on this machine) — never

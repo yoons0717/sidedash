@@ -18,11 +18,6 @@ export interface LastCommit {
   message: string;
 }
 
-export interface AnalysisResult {
-  summary: string;
-  analyzedAt: string;
-}
-
 export interface GitStatus {
   branch: string | null;
   hasUncommittedChanges: boolean;
@@ -45,7 +40,6 @@ export interface ProjectCard {
   action: ActionType | null;
   lastRun: string | null;
   githubUrl: string | null;
-  lastAnalysis: AnalysisResult | null;
 }
 
 export type AddProjectRejectionReason = 'already-registered' | 'name-collision';

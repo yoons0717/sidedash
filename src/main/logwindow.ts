@@ -33,6 +33,11 @@ export function openLogWindow(title: string, project: LogWindowProject): LogWind
   // hide-on-blur, closing the popup the moment the log window appears.
   win.once('ready-to-show', () => win.showInactive());
 
+  // logwindow.html's static <title> tag would otherwise override the
+  // per-project title above the moment the page finishes loading, per
+  // Electron's default (page title always wins over the constructor option).
+  win.on('page-title-updated', (event) => event.preventDefault());
+
   // electron-vite serves the renderer from a dev server (HMR) instead of a
   // built file while `npm run dev` is running.
   if (import.meta.env.DEV && process.env['ELECTRON_RENDERER_URL']) {

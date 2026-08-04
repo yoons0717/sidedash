@@ -41,6 +41,11 @@ macOS 메뉴바에서 여러 사이드 프로젝트의 상태를 확인하고 �
   <img src="docs/screenshots/log-window.png" alt="액션 실행 로그 창" width="420" />
 </p>
 
+**상태 점검**
+- "🔍 상태 점검" 버튼 → Claude Code CLI(`claude -p`)가 최근 git 커밋과 소스 구조를 읽고 완성도 점수(0~100)와 다음 할 일 한 줄을 판단
+- 평가 기준(점수 구간별 설명)과 결과를 로그 창에 스트리밍 — 어떤 프로젝트부터 손대야 할지 판단할 재료만 보여주고, 계속할지 말지는 추천하지 않음
+- 결과는 저장하지 않고 로그 창에서만 확인 — 카드에는 아무 흔적도 남지 않으며, 다시 보려면 버튼을 다시 눌러야 함
+
 ## 데이터 레이어
 
 프로젝트 레지스트리는 `src/main/lib/registry.ts`에서 관리하며 `~/.pj/registry.json`에 저장됩니다.
@@ -53,6 +58,7 @@ Git 정보(브랜치, 마지막 커밋, GitHub URL)는 `src/main/lib/scanner.ts`
 
 - macOS
 - Node.js
+- Claude Code CLI (`claude`) — "상태 점검" 기능에 사용, 로그인되어 있어야 합니다.
 
 ## 시작하기
 
