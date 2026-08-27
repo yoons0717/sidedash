@@ -4,8 +4,7 @@ import { app, ipcMain, dialog, shell, Notification } from 'electron';
 import { menubar } from 'menubar';
 import * as registry from './lib/registry';
 import { getProjectCards, canAddProject } from './ipc/projects';
-import { toggleServerWindow, pushServers } from './serverwindow';
-import { killServer } from './lib/portscan';
+import { killServer, getRunningServers } from './lib/portscan';
 import {
   runAction,
   isRunning,
@@ -89,12 +88,9 @@ const mb = menubar({
 
 ipcMain.handle('get-project-cards', () => getProjectCards(HISTORY_FILE));
 
-ipcMain.handle('toggle-server-window', () => toggleServerWindow(mb.window!));
+ipcMain.handle('get-running-servers', () => getRunningServers(registry.getAll(), app.getAppPath()));
 
-ipcMain.handle('kill-server', async (_event, pid: number) => {
-  await killServer(pid);
-  pushServers();
-});
+ipcMain.handle('kill-server', (_event, pid: number) => killServer(pid));
 
 const ADD_REJECTION_MESSAGES: Record<AddProjectRejectionReason, string> = {
   'already-registered': '이미 등록된 프로젝트입니다.',

@@ -1,9 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ActionExitedPayload, ProjectCard, RunActionResult, UncommittedFile } from '../shared/types';
+import type {
+  ActionExitedPayload,
+  ProjectCard,
+  RunActionResult,
+  ServerInfo,
+  UncommittedFile,
+} from '../shared/types';
 
 const api = {
   getProjectCards: (): Promise<ProjectCard[]> => ipcRenderer.invoke('get-project-cards'),
-  toggleServerWindow: (): Promise<void> => ipcRenderer.invoke('toggle-server-window'),
+  getRunningServers: (): Promise<ServerInfo[]> => ipcRenderer.invoke('get-running-servers'),
+  killServer: (pid: number): Promise<void> => ipcRenderer.invoke('kill-server', pid),
   addProject: (): Promise<ProjectCard[]> => ipcRenderer.invoke('add-project'),
   removeProject: (name: string): Promise<ProjectCard[]> => ipcRenderer.invoke('remove-project', name),
   runAction: (path: string, targetPaths: string[]): Promise<RunActionResult> =>

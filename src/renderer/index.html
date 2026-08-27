@@ -76,6 +76,87 @@
       .toggle-servers-btn:hover {
         background: #35355a;
       }
+      #server-view {
+        display: none;
+        flex: 1;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      body.server-mode #server-view {
+        display: flex;
+      }
+      body.server-mode .sort-toggle,
+      body.server-mode #project-list {
+        display: none;
+      }
+      .server-view-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 18px 8px;
+        flex-shrink: 0;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .server-back-btn {
+        border: none;
+        background: none;
+        cursor: pointer;
+        color: #c8c8dd;
+        font-size: 16px;
+        padding: 0;
+        line-height: 1;
+      }
+      .server-back-btn:hover {
+        color: #fff;
+      }
+      #server-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 14px 14px;
+      }
+      .server-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .server-row:hover {
+        background: #20203a;
+      }
+      .server-row-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+        min-width: 0;
+      }
+      .server-row-meta {
+        flex-shrink: 0;
+        color: #6fc9d6;
+        font-size: 12px;
+      }
+      .server-row-kill {
+        flex-shrink: 0;
+        border: none;
+        background: none;
+        cursor: pointer;
+        color: #7a7a9a;
+        font-size: 12px;
+        padding: 4px 6px;
+        border-radius: 6px;
+      }
+      .server-row-kill:hover {
+        color: #e57373;
+        background: #2c2c46;
+      }
+      .server-row-kill:disabled {
+        cursor: default;
+        color: #5a5a75;
+      }
       #project-list {
         flex: 1;
         overflow-y: auto;
@@ -410,6 +491,13 @@
       <button id="sort-name" class="sort-btn">이름순</button>
     </div>
     <div id="project-list"></div>
+    <div id="server-view">
+      <div class="server-view-header">
+        <button id="server-back" class="server-back-btn" title="뒤로가기">←</button>
+        실행 중인 서버
+      </div>
+      <div id="server-list"></div>
+    </div>
     <div class="footer">
       <button id="quit-app" class="quit-btn">종료</button>
       <span id="dev-badge" class="dev-badge"></span>

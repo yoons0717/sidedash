@@ -17,7 +17,6 @@
     "src/renderer/src/**/*",
     "src/preload/index.d.ts",
     "src/preload/logwindow.d.ts",
-    "src/preload/serverwindow.d.ts",
     "src/shared/**/*"
   ]
 }

@@ -15,7 +15,6 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'src/preload/index.ts'),
           logwindow: resolve(__dirname, 'src/preload/logwindow.ts'),
-          serverwindow: resolve(__dirname, 'src/preload/serverwindow.ts'),
         },
       },
     },
@@ -27,7 +26,6 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'src/renderer/index.html'),
           logwindow: resolve(__dirname, 'src/renderer/logwindow.html'),
-          serverwindow: resolve(__dirname, 'src/renderer/serverwindow.html'),
         },
       },
     },
