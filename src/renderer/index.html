@@ -61,6 +61,21 @@
         color: #9b9bf0;
         font-weight: 600;
       }
+      .toggle-servers-btn {
+        width: 24px;
+        height: 24px;
+        border-radius: 7px;
+        background: #2c2c46;
+        border: none;
+        color: #c8c8dd;
+        font-size: 13px;
+        cursor: pointer;
+        transition: background-color 0.1s ease;
+        margin-right: 6px;
+      }
+      .toggle-servers-btn:hover {
+        background: #35355a;
+      }
       #project-list {
         flex: 1;
         overflow-y: auto;
@@ -385,7 +400,10 @@
   <body>
     <div class="header">
       <div class="header-title">내 프로젝트 (<span id="project-count">0</span>)</div>
-      <button id="add-project" class="add-btn">＋</button>
+      <div>
+        <button id="toggle-servers" class="toggle-servers-btn" title="실행 중인 서버">🖥</button>
+        <button id="add-project" class="add-btn">＋</button>
+      </div>
     </div>
     <div class="sort-toggle">
       <button id="sort-recent" class="sort-btn active">최근순</button>

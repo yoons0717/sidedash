@@ -527,6 +527,9 @@ async function init(): Promise<void> {
     document.getElementById('dev-badge')!.textContent = 'dev';
   }
   document.getElementById('add-project')!.addEventListener('click', handleAdd);
+  document.getElementById('toggle-servers')!.addEventListener('click', () => {
+    window.api.toggleServerWindow().catch((err) => console.error('toggle-server-window failed:', err));
+  });
   document.getElementById('quit-app')!.addEventListener('click', () => {
     window.api.quitApp().catch((err) => console.error('quit-app failed:', err));
   });

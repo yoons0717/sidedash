@@ -42,6 +42,15 @@ export interface ProjectCard {
   githubUrl: string | null;
 }
 
+export interface ServerInfo {
+  port: number;
+  pid: number;
+  projectName: string | null;
+  cwd: string | null;
+  techStack: string;
+  command: string;
+}
+
 export type AddProjectRejectionReason = 'already-registered' | 'name-collision';
 
 export type CanAddProjectResult = { ok: true } | { ok: false; reason: AddProjectRejectionReason };

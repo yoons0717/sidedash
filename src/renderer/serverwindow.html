@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>실행 중인 서버</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        background: #1a1a2e;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 13px;
+        color: #e8e8f0;
+      }
+      #server-list {
+        padding: 8px;
+      }
+      .server-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .server-row:hover {
+        background: #20203a;
+      }
+      .server-row-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+        min-width: 0;
+      }
+      .server-row-meta {
+        flex-shrink: 0;
+        color: #6fc9d6;
+        font-size: 12px;
+      }
+      .server-row-kill {
+        flex-shrink: 0;
+        border: none;
+        background: none;
+        cursor: pointer;
+        color: #7a7a9a;
+        font-size: 12px;
+        padding: 4px 6px;
+        border-radius: 6px;
+      }
+      .server-row-kill:hover {
+        color: #e57373;
+        background: #2c2c46;
+      }
+      .server-row-kill:disabled {
+        cursor: default;
+        color: #5a5a75;
+      }
+      .empty-state {
+        padding: 24px 18px;
+        text-align: center;
+        color: #9a9ab8;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="server-list"></div>
+    <script type="module" src="./src/serverwindow.ts"></script>
+  </body>
+</html>
