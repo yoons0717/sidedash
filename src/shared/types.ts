@@ -24,11 +24,6 @@ export interface GitStatus {
   changedFileCount: number;
 }
 
-export interface UncommittedFile {
-  status: string;
-  file: string;
-}
-
 export interface ProjectCard {
   name: string;
   path: string;

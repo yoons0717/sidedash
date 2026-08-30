@@ -4,7 +4,6 @@ import type {
   ProjectCard,
   RunActionResult,
   ServerInfo,
-  UncommittedFile,
 } from '../shared/types';
 
 const api = {
@@ -20,8 +19,6 @@ const api = {
   openInVscode: (path: string): Promise<void> => ipcRenderer.invoke('open-in-vscode', path),
   openInCmux: (path: string): Promise<void> => ipcRenderer.invoke('open-in-cmux', path),
   openInFinder: (path: string): Promise<void> => ipcRenderer.invoke('open-in-finder', path),
-  getUncommittedFiles: (path: string): Promise<UncommittedFile[]> =>
-    ipcRenderer.invoke('get-uncommitted-files', path),
   quitApp: (): Promise<void> => ipcRenderer.invoke('quit-app'),
   onActionExited: (callback: (payload: ActionExitedPayload) => void): void => {
     ipcRenderer.on('action-exited', (_event, payload: ActionExitedPayload) => callback(payload));

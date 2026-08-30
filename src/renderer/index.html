@@ -43,24 +43,6 @@
       .add-btn:hover {
         background: #35355a;
       }
-      .sort-toggle {
-        display: flex;
-        gap: 12px;
-        padding: 0 18px 8px;
-        flex-shrink: 0;
-      }
-      .sort-btn {
-        border: none;
-        background: none;
-        cursor: pointer;
-        font-size: 11px;
-        color: #7a7a95;
-        padding: 2px 0;
-      }
-      .sort-btn.active {
-        color: #9b9bf0;
-        font-weight: 600;
-      }
       .toggle-servers-btn {
         width: 24px;
         height: 24px;
@@ -85,7 +67,6 @@
       body.server-mode #server-view {
         display: flex;
       }
-      body.server-mode .sort-toggle,
       body.server-mode #project-list {
         display: none;
       }
@@ -171,12 +152,6 @@
         border: 1px solid transparent;
         transition: background-color 0.1s ease;
       }
-      .card.clickable {
-        cursor: pointer;
-      }
-      .card.clickable:hover {
-        background: #20203a;
-      }
       .card.expanded-style {
         background: #22223a;
         border-color: #35355a;
@@ -240,11 +215,6 @@
         white-space: nowrap;
         min-width: 0;
       }
-      .card-detail-main.expanded {
-        white-space: normal;
-        overflow: visible;
-        text-overflow: unset;
-      }
       .card-detail-date {
         flex-shrink: 0;
         color: #6a6a85;
@@ -258,21 +228,6 @@
       .card-branch {
         color: #6fc9d6;
         font-weight: 600;
-      }
-      .card-files {
-        margin-top: 8px;
-        padding: 8px 10px;
-        background: #22223a;
-        border-radius: 8px;
-        font-family: Menlo, Consolas, monospace;
-        font-size: 11px;
-        color: #b5b5d0;
-        line-height: 1.6;
-      }
-      .card-files-line {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
       .card-last-run {
         font-size: 11px;
@@ -485,10 +440,6 @@
         <button id="toggle-servers" class="toggle-servers-btn" title="실행 중인 서버">🖥</button>
         <button id="add-project" class="add-btn">＋</button>
       </div>
-    </div>
-    <div class="sort-toggle">
-      <button id="sort-recent" class="sort-btn active">최근순</button>
-      <button id="sort-name" class="sort-btn">이름순</button>
     </div>
     <div id="project-list"></div>
     <div id="server-view">

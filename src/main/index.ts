@@ -15,7 +15,6 @@ import {
   ANALYSIS_CRITERIA,
 } from './actions/run';
 import { recordRun } from './actions/history';
-import { getUncommittedFiles } from './actions/git';
 import { openLogWindow, type LogWindowHandle } from './logwindow';
 import type { AddProjectRejectionReason, ProjectCard, RunActionResult } from '../shared/types';
 import { ACTION_LABELS } from '../shared/types';
@@ -138,8 +137,6 @@ ipcMain.handle('open-in-finder', async (_event, projectPath: string) => {
     dialog.showErrorBox('Finder에서 열 수 없습니다', error);
   }
 });
-
-ipcMain.handle('get-uncommitted-files', (_event, projectPath: string) => getUncommittedFiles(projectPath));
 
 // Neither `open -a` nor a missing shell command produce a spawn 'error'
 // event on their own (the child process itself launches fine) — the failure

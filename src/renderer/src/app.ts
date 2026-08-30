@@ -15,7 +15,6 @@ const DEFAULT_ICON = { text: '📁', className: '' };
 
 const runningPaths = new Set<string>();
 let currentProjects: ProjectCard[] = [];
-let sortMode: 'recent' | 'name' = 'recent';
 
 function formatRelativeTime(isoString: string, now = new Date()): string {
   const diffMs = now.getTime() - new Date(isoString).getTime();
@@ -30,18 +29,13 @@ function formatRelativeTime(isoString: string, now = new Date()): string {
 }
 
 function sortProjects(projects: ProjectCard[]): ProjectCard[] {
-  const sorted = [...projects];
-  if (sortMode === 'name') {
-    sorted.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-  } else {
-    // Projects with no commit date (missing path, no commits yet) sort last.
-    sorted.sort((a, b) => {
-      const aTime = a.lastCommit ? new Date(a.lastCommit.date).getTime() : -Infinity;
-      const bTime = b.lastCommit ? new Date(b.lastCommit.date).getTime() : -Infinity;
-      return bTime - aTime;
-    });
-  }
-  return sorted;
+  // Most recent commit first; projects with no commit date (missing path, no
+  // commits yet) sort last.
+  return [...projects].sort((a, b) => {
+    const aTime = a.lastCommit ? new Date(a.lastCommit.date).getTime() : -Infinity;
+    const bTime = b.lastCommit ? new Date(b.lastCommit.date).getTime() : -Infinity;
+    return bTime - aTime;
+  });
 }
 
 const ANALYZE_BUTTON_LABEL = '🔍 상태 점검';
@@ -131,45 +125,11 @@ function handleRunAnalysis(
   );
 }
 
-// A card can have a target-select panel (pipeline action) and a files panel
-// (uncommitted changes) at the same time — deriving expanded-style from
-// current visibility (rather than each toggle setting it directly) keeps
-// the two from clobbering each other's state when only one closes.
 function syncExpandedStyle(card: HTMLElement): void {
-  const anyOpen = [...card.querySelectorAll<HTMLElement>('.target-select, .card-files')].some(
+  const anyOpen = [...card.querySelectorAll<HTMLElement>('.target-select')].some(
     (panel) => panel.style.display !== 'none'
   );
   card.classList.toggle('expanded-style', anyOpen);
-}
-
-function buildFilesPanel(): HTMLDivElement {
-  const panel = document.createElement('div');
-  panel.className = 'card-files';
-  panel.style.display = 'none';
-  return panel;
-}
-
-async function toggleFilesPanel(project: ProjectCard, panel: HTMLDivElement, card: HTMLElement): Promise<void> {
-  const isOpen = panel.style.display !== 'none';
-  if (isOpen) {
-    panel.style.display = 'none';
-    syncExpandedStyle(card);
-    return;
-  }
-
-  if (!panel.dataset.loaded) {
-    const files = await window.api.getUncommittedFiles(project.path);
-    for (const { status, file } of files) {
-      const line = document.createElement('div');
-      line.className = 'card-files-line';
-      line.textContent = `${status} ${file}`;
-      panel.appendChild(line);
-    }
-    panel.dataset.loaded = 'true';
-  }
-
-  panel.style.display = 'block';
-  syncExpandedStyle(card);
 }
 
 function buildTargetSelectPanel(
@@ -367,30 +327,23 @@ function renderCard(project: ProjectCard): HTMLDivElement {
 
   const detail = document.createElement('div');
   detail.className = 'card-detail';
-  let filesPanel: HTMLDivElement | null = null;
-  let detailMainSpan: HTMLSpanElement | null = null;
 
   if (!project.pathExists) {
     detail.classList.add('missing');
     detail.textContent = '경로를 찾을 수 없음';
   } else {
-    const branch = project.branch ?? '(알 수 없음)';
-    const commitMessage = project.lastCommit ? project.lastCommit.message : '(커밋 없음)';
-
     const mainSpan = document.createElement('span');
     mainSpan.className = 'card-detail-main';
     const branchSpan = document.createElement('span');
     branchSpan.className = 'card-branch';
-    branchSpan.textContent = branch;
+    branchSpan.textContent = project.branch ?? '(알 수 없음)';
     mainSpan.appendChild(branchSpan);
-    mainSpan.appendChild(document.createTextNode(` · ${commitMessage}`));
     detail.appendChild(mainSpan);
-    detailMainSpan = mainSpan;
 
     if (project.lastCommit) {
       const dateSpan = document.createElement('span');
       dateSpan.className = 'card-detail-date';
-      dateSpan.textContent = project.lastCommit.date;
+      dateSpan.textContent = formatRelativeTime(project.lastCommit.date);
       detail.appendChild(dateSpan);
     }
   }
@@ -417,23 +370,6 @@ function renderCard(project: ProjectCard): HTMLDivElement {
     dirtyLine.className = 'card-dirty-toggle';
     dirtyLine.textContent = `미커밋 변경사항 ${project.changedFileCount}개`;
     body.appendChild(dirtyLine);
-
-    filesPanel = buildFilesPanel();
-    body.appendChild(filesPanel);
-  }
-
-  // Clicking a card toggles its truncated commit message open and the
-  // uncommitted-files panel at once, for the same reason: each is a "this is
-  // truncated for space" affordance and there's no reason to make the user
-  // find a separate toggle per line.
-  if (detailMainSpan || filesPanel) {
-    card.classList.add('clickable');
-    card.addEventListener('click', () => {
-      detailMainSpan?.classList.toggle('expanded');
-      if (filesPanel) {
-        toggleFilesPanel(project, filesPanel, card);
-      }
-    });
   }
 
   if (project.action && project.lastRun) {
@@ -478,13 +414,6 @@ function renderProjects(projects: ProjectCard[]): void {
       listEl.appendChild(divider);
     }
   });
-}
-
-function setSortMode(mode: 'recent' | 'name'): void {
-  sortMode = mode;
-  document.getElementById('sort-recent')!.classList.toggle('active', mode === 'recent');
-  document.getElementById('sort-name')!.classList.toggle('active', mode === 'name');
-  renderProjects(currentProjects);
 }
 
 async function handleRemove(name: string): Promise<void> {
@@ -618,8 +547,6 @@ async function init(): Promise<void> {
   document.getElementById('quit-app')!.addEventListener('click', () => {
     window.api.quitApp().catch((err) => console.error('quit-app failed:', err));
   });
-  document.getElementById('sort-recent')!.addEventListener('click', () => setSortMode('recent'));
-  document.getElementById('sort-name')!.addEventListener('click', () => setSortMode('name'));
   window.api.onActionExited(handleActionExited);
 
   // menubar keeps this window's page loaded and just shows/hides it rather
