@@ -75,20 +75,12 @@ export function buildAnalyzeCommand(claudeBinary: string): string {
 }
 
 // A prompted arg string replaces `{args}` in a custom action's command, or
-// is appended when the token is absent (a forgiving default — the user
-// turned the prompt on, so the input should reach the command somehow).
-//
-// Deliberately NOT shellQuote()'d, unlike every other value this codebase
-// interpolates into a shell command (targetPaths, the claude binary path,
-// cmux's CLI path). Those are all a single filesystem path passed through
-// verbatim; a prompted arg is closer to "the rest of a command line" —
-// `--flag value` or `-x foo -y bar` needs its spaces to stay unquoted to
-// mean multiple shell words, which is the more common case for this field.
-// The tradeoff: an argument meant as one token but containing a space or
-// shell metacharacter (;, &&, a backtick) gets word-split or interpreted
-// rather than passed through literally. Acceptable for a personal tool
-// where the user is trusted to know they're extending their own shell
-// command, not filling in an opaque form field.
+// is appended when absent. Deliberately NOT shellQuote()'d, unlike every
+// other value interpolated into a shell command here — a prompted arg is
+// "the rest of a command line" (`--flag value`), so it needs to stay
+// unquoted to split into multiple shell words. Risk: a space or shell
+// metacharacter meant literally gets word-split/interpreted instead. See
+// CLAUDE.md's 개인 도구 principle for why that's an accepted tradeoff here.
 export function applyArgs(command: string, args: string): string {
   if (command.includes('{args}')) {
     return command.replaceAll('{args}', args);

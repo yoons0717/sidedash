@@ -129,7 +129,7 @@ src/
 │   ├── ipc/
 │   │   └── projects.ts   # 프로젝트 조회, 등록, 삭제 IPC
 │   └── lib/
-│       ├── registry.ts   # 프로젝트 등록/조회/삭제
+│       ├── registry.ts   # 프로젝트 등록/조회/삭제, 커스텀 액션 CRUD
 │       ├── scanner.ts    # Git 상태(status --porcelain) 및 package.json 스캔
 │       ├── portscan.ts   # lsof 기반 개발 서버 감지 / 종료
 │       └── jsonStore.ts  # JSON 저장소 read / write 헬퍼
@@ -137,7 +137,15 @@ src/
 │   ├── index.ts
 │   └── logwindow.ts
 ├── renderer/
-│   ├── index.html / src/app.ts
+│   ├── index.html            # 마크업만 (스타일은 src/app.css)
+│   ├── src/app.ts             # 엔트리포인트 — init() + 뷰 전환
+│   ├── src/app.css            # 팝업 스타일
+│   ├── src/state.ts           # 뷰 간 공유 상태
+│   ├── src/cards.ts           # 프로젝트 카드 렌더 + 목록 관리
+│   ├── src/card-runner.ts     # 액션 실행 orchestration, 버튼 상태
+│   ├── src/card-panels.ts     # 카드 안에서 펼치는 패널
+│   ├── src/actions-view.ts    # 액션 목록/폼 서브뷰
+│   ├── src/servers-view.ts    # 실행 중인 서버 서브뷰
 │   └── logwindow.html / src/logwindow.ts
 └── shared/
     ├── types.ts
