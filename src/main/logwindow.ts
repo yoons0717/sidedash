@@ -5,6 +5,7 @@ import type { RunKind } from '../shared/types';
 interface LogWindowProject {
   path: string;
   actionType: RunKind;
+  resultDir?: string;
 }
 
 export interface LogWindowHandle {
@@ -70,7 +71,13 @@ export function openLogWindow(title: string, project: LogWindowProject): LogWind
 
   return {
     appendData: (chunk) => send('log-data', chunk),
-    finish: (code) => send('log-exit', { code, path: project.path, actionType: project.actionType }),
+    finish: (code) =>
+      send('log-exit', {
+        code,
+        path: project.path,
+        actionType: project.actionType,
+        resultDir: project.resultDir,
+      }),
     focus: () => {
       if (win.isDestroyed()) return;
       if (win.isMinimized()) win.restore();

@@ -29,6 +29,15 @@ macOS 메뉴바에서 여러 사이드 프로젝트의 상태를 확인하고 �
 - 미커밋 변경 파일 수 표시
 - ＋ / ✕ 버튼으로 등록 및 제거
 
+**실행 중인 개발 서버**
+- 🖥 버튼으로 서버 목록 뷰 전환, 열 때마다 새로고침
+- `lsof`로 리스닝 포트를 스캔해 node · python · ruby · php · java · deno · bun 프로세스만 표시
+- 프로젝트명 · 스택 · 포트 표시, 행 클릭 시 브라우저로 열기, ✕ 버튼으로 종료
+
+<p align="center">
+  <img src="docs/screenshots/servers.png" alt="실행 중인 개발 서버 목록" width="260" />
+</p>
+
 **액션 실행**
 - `run.sh` → "파이프라인 실행" (대상 프로젝트 선택 → 인자 전달 → 실행 명령 미리보기)
 - `package.json`의 `scripts.pdf` → "PDF 생성"
@@ -40,6 +49,12 @@ macOS 메뉴바에서 여러 사이드 프로젝트의 상태를 확인하고 �
   <img src="docs/screenshots/target-select.png" alt="대상 프로젝트 선택 패널" width="240" />
   <img src="docs/screenshots/log-window.png" alt="액션 실행 로그 창" width="420" />
 </p>
+
+**커스텀 액션**
+- 카드의 "＋ 액션"으로 프로젝트별 액션(라벨 + 셸 명령어)을 등록/수정/삭제 — 자동 감지된 파이프라인/PDF 액션과 별개로 원하는 만큼 추가
+- 명령어 입력 시 `package.json` 스크립트를 클릭 한 번으로 채울 수 있는 추천 칩 표시
+- "실행 시 인자 입력받기"를 켜면 실행 전 입력값이 명령어의 `{args}` 자리에 삽입 (토큰이 없으면 뒤에 붙음)
+- "결과 폴더" 지정 시 완료 후 로그 창에 여는 버튼 표시
 
 **상태 점검**
 - "🔍 상태 점검" 버튼 → Claude Code CLI(`claude -p`)가 최근 git 커밋과 소스 구조를 읽고 완성도 점수(0~100)와 다음 할 일 한 줄을 판단
@@ -110,13 +125,14 @@ src/
 │   ├── actions/
 │   │   ├── detect.ts     # run.sh / pdf 스크립트 감지
 │   │   ├── run.ts        # 액션 실행, 로그 스트리밍, 프로세스 트리 정리
-│   │   ├── git.ts        # git status --porcelain 파싱
 │   │   └── history.ts    # 마지막 실행 시각 관리
 │   ├── ipc/
 │   │   └── projects.ts   # 프로젝트 조회, 등록, 삭제 IPC
 │   └── lib/
 │       ├── registry.ts   # 프로젝트 등록/조회/삭제
-│       └── scanner.ts    # Git 정보 및 package.json 스캔
+│       ├── scanner.ts    # Git 상태(status --porcelain) 및 package.json 스캔
+│       ├── portscan.ts   # lsof 기반 개발 서버 감지 / 종료
+│       └── jsonStore.ts  # JSON 저장소 read / write 헬퍼
 ├── preload/
 │   ├── index.ts
 │   └── logwindow.ts
@@ -124,7 +140,8 @@ src/
 │   ├── index.html / src/app.ts
 │   └── logwindow.html / src/logwindow.ts
 └── shared/
-    └── types.ts
+    ├── types.ts
+    └── format.ts          # 액션 결과 메시지 포맷
 
 resources/                 # 메뉴바 아이콘 등 런타임 리소스
 electron.vite.config.ts    # main / preload / renderer 빌드 설정

@@ -7,6 +7,7 @@ import { getProjectCards, canAddProject } from './ipc/projects';
 import { killServer, getRunningServers } from './lib/portscan';
 import {
   runAction,
+  applyArgs,
   isRunning,
   hasRunningActions,
   killAllRunning,
@@ -16,7 +17,12 @@ import {
 } from './actions/run';
 import { recordRun } from './actions/history';
 import { openLogWindow, type LogWindowHandle } from './logwindow';
-import type { AddProjectRejectionReason, ProjectCard, RunActionResult } from '../shared/types';
+import type {
+  AddProjectRejectionReason,
+  CustomActionInput,
+  ProjectCard,
+  RunActionResult,
+} from '../shared/types';
 import { ACTION_LABELS } from '../shared/types';
 import { formatActionResultMessage } from '../shared/format';
 
@@ -123,6 +129,33 @@ ipcMain.handle('remove-project', (_event, name: string) => {
     registry.remove(name);
   } catch (err) {
     dialog.showErrorBox('프로젝트를 삭제할 수 없습니다', err instanceof Error ? err.message : String(err));
+  }
+  return getProjectCards(HISTORY_FILE);
+});
+
+ipcMain.handle('add-custom-action', (_event, name: string, input: CustomActionInput) => {
+  try {
+    registry.addAction(name, input);
+  } catch (err) {
+    dialog.showErrorBox('액션을 추가할 수 없습니다', err instanceof Error ? err.message : String(err));
+  }
+  return getProjectCards(HISTORY_FILE);
+});
+
+ipcMain.handle('update-custom-action', (_event, name: string, actionId: string, input: CustomActionInput) => {
+  try {
+    registry.updateAction(name, actionId, input);
+  } catch (err) {
+    dialog.showErrorBox('액션을 수정할 수 없습니다', err instanceof Error ? err.message : String(err));
+  }
+  return getProjectCards(HISTORY_FILE);
+});
+
+ipcMain.handle('remove-custom-action', (_event, name: string, actionId: string) => {
+  try {
+    registry.removeAction(name, actionId);
+  } catch (err) {
+    dialog.showErrorBox('액션을 삭제할 수 없습니다', err instanceof Error ? err.message : String(err));
   }
   return getProjectCards(HISTORY_FILE);
 });
@@ -284,3 +317,45 @@ ipcMain.handle('run-analysis', (_event, projectPath: string): RunActionResult =>
 
   return { ok: true };
 });
+
+ipcMain.handle(
+  'run-custom-action',
+  (_event, projectPath: string, actionId: string, args?: string): RunActionResult => {
+    const cards = getProjectCards(HISTORY_FILE);
+    const project = cards.find((p) => p.path === projectPath);
+    const action = project?.customActions.find((a) => a.id === actionId);
+    // A blank command can't reach here through the form (Save is disabled
+    // until both fields are non-empty), but a hand-edited registry.json can
+    // still produce one — runAction() silently no-ops for it, which would
+    // otherwise leave an opened, empty log window that never gets a
+    // log-exit and a card stuck "실행 중…" forever.
+    if (!project || !project.pathExists || !action || !action.command) {
+      return { ok: false, reason: 'invalid' };
+    }
+
+    if (isRunning(project.path)) {
+      return { ok: false, reason: 'already-running' };
+    }
+
+    const command = action.promptArgs ? applyArgs(action.command, args ?? '') : action.command;
+    const projectWithType = {
+      ...project,
+      actionType: 'custom' as const,
+      command,
+      resultDir: action.resultDir,
+    };
+    const logWindow = openLogWindow(`${project.name} · ${action.label}`, projectWithType);
+
+    runAction(projectWithType, [], {
+      onData: (chunk) => logWindow.appendData(chunk),
+      onExit: (code) => {
+        if (code === 0) {
+          recordRun(HISTORY_FILE, project.path);
+        }
+        reportActionExit(project, logWindow, code, action.label);
+      },
+    });
+
+    return { ok: true };
+  }
+);

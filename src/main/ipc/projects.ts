@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as registry from '../lib/registry';
-import { getLastCommit, getGitStatus, getGitHubUrl } from '../lib/scanner';
+import { getLastCommit, getGitStatus, getGitHubUrl, getPackageScripts } from '../lib/scanner';
 import { detectAction } from '../actions/detect';
 import { getLastRun } from '../actions/history';
 import type { CanAddProjectResult, ProjectCard } from '../../shared/types';
@@ -27,7 +27,8 @@ export function canAddProject(
 }
 
 export function getProjectCards(historyFilePath: string): ProjectCard[] {
-  return registry.getAll().map(({ name, path: projectPath }) => {
+  return registry.getAll().map(({ name, path: projectPath, actions }) => {
+    const customActions = actions ?? [];
     const lastRun = historyFilePath ? getLastRun(historyFilePath, projectPath) : null;
     const pathExists = fs.existsSync(projectPath);
     if (!pathExists) {
@@ -40,6 +41,8 @@ export function getProjectCards(historyFilePath: string): ProjectCard[] {
         changedFileCount: 0,
         pathExists,
         action: null,
+        customActions,
+        scripts: [],
         lastRun,
         githubUrl: null,
       };
@@ -57,6 +60,8 @@ export function getProjectCards(historyFilePath: string): ProjectCard[] {
       changedFileCount: gitStatus?.changedFileCount ?? 0,
       pathExists,
       action: detectAction(projectPath),
+      customActions,
+      scripts: Object.keys(getPackageScripts(projectPath)),
       lastRun,
       githubUrl: getGitHubUrl(projectPath),
     };

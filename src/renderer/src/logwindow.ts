@@ -12,21 +12,32 @@ window.logApi.onLogData((chunk) => {
   appendText(chunk);
 });
 
-window.logApi.onLogExit(({ code, path, actionType }) => {
+window.logApi.onLogExit(({ code, path, actionType, resultDir }) => {
   if (code === 0) {
     statusEl.className = 'success';
     statusEl.textContent = '완료';
 
-    // Analysis output is already the full log body — there's no separate
-    // output folder to open, unlike pipeline (notes/) or pdf (pdf-output/).
-    if (actionType !== 'analyze') {
-      const folder = actionType === 'pipeline' ? `${path}/notes` : `${path}/pdf-output`;
-      const label = actionType === 'pipeline' ? '노트 열기' : 'PDF 폴더 열기';
+    // pipeline (notes/) and pdf (pdf-output/) always write to a known
+    // folder; a custom action only has one if the user set 결과 폴더.
+    // Analysis output is the log body itself — never a folder.
+    let folder: string | null = null;
+    let label = '결과 폴더 열기';
+    if (actionType === 'pipeline') {
+      folder = `${path}/notes`;
+      label = '노트 열기';
+    } else if (actionType === 'pdf') {
+      folder = `${path}/pdf-output`;
+      label = 'PDF 폴더 열기';
+    } else if (actionType === 'custom' && resultDir) {
+      folder = resultDir.startsWith('/') ? resultDir : `${path}/${resultDir}`;
+    }
 
+    if (folder) {
+      const target = folder;
       const button = document.createElement('button');
       button.textContent = label;
       button.onclick = () => {
-        window.logApi.openPath(folder).then((errorMessage) => {
+        window.logApi.openPath(target).then((errorMessage) => {
           if (errorMessage) {
             appendText(`\n폴더를 열 수 없습니다: ${errorMessage}\n`);
           }

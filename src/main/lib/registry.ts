@@ -1,6 +1,7 @@
 import path from 'node:path';
 import os from 'node:os';
-import type { RegistryEntry } from '../../shared/types';
+import { randomUUID } from 'node:crypto';
+import type { CustomActionInput, RegistryEntry } from '../../shared/types';
 import { readJsonStore, writeJsonStore } from './jsonStore';
 
 const REGISTRY_PATH = path.join(os.homedir(), '.pj', 'registry.json');
@@ -41,5 +42,48 @@ export function add(name: string, projectPath: string): void {
 export function remove(name: string): void {
   const registry = readRegistry();
   registry.projects = registry.projects.filter((p) => p.name !== name);
+  writeRegistry(registry);
+}
+
+// Keep stored actions minimal — omit the optional flags when they carry no
+// meaning, so a plain action stays `{ id, label, command }` on disk.
+function normalize(input: CustomActionInput): CustomActionInput {
+  return {
+    label: input.label,
+    command: input.command,
+    ...(input.promptArgs ? { promptArgs: true } : {}),
+    ...(input.resultDir ? { resultDir: input.resultDir } : {}),
+  };
+}
+
+export function addAction(projectName: string, input: CustomActionInput): void {
+  const registry = readRegistry();
+  const project = registry.projects.find((p) => p.name === projectName);
+  if (!project) {
+    return;
+  }
+  project.actions = [...(project.actions ?? []), { id: randomUUID(), ...normalize(input) }];
+  writeRegistry(registry);
+}
+
+export function updateAction(projectName: string, actionId: string, input: CustomActionInput): void {
+  const registry = readRegistry();
+  const project = registry.projects.find((p) => p.name === projectName);
+  if (!project?.actions) {
+    return;
+  }
+  project.actions = project.actions.map((a) =>
+    a.id === actionId ? { id: a.id, ...normalize(input) } : a
+  );
+  writeRegistry(registry);
+}
+
+export function removeAction(projectName: string, actionId: string): void {
+  const registry = readRegistry();
+  const project = registry.projects.find((p) => p.name === projectName);
+  if (!project?.actions) {
+    return;
+  }
+  project.actions = project.actions.filter((a) => a.id !== actionId);
   writeRegistry(registry);
 }

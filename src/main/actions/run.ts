@@ -5,6 +5,9 @@ import type { RunKind } from '../../shared/types';
 export interface RunnableProject {
   path: string;
   actionType: RunKind;
+  // Only read for actionType 'custom' — the exact shell command the user
+  // saved for this action button.
+  command?: string;
 }
 
 export interface RunActionCallbacks {
@@ -69,6 +72,28 @@ export function getResolvedClaudeBinary(): string {
 // error. Redirecting from /dev/null skips the wait and the warning.
 export function buildAnalyzeCommand(claudeBinary: string): string {
   return `${shellQuote(claudeBinary)} -p ${shellQuote(ANALYSIS_PROMPT)} --allowedTools ${shellQuote('Read')} ${shellQuote('Glob')} ${shellQuote('Bash(git log:*)')} < /dev/null`;
+}
+
+// A prompted arg string replaces `{args}` in a custom action's command, or
+// is appended when the token is absent (a forgiving default — the user
+// turned the prompt on, so the input should reach the command somehow).
+//
+// Deliberately NOT shellQuote()'d, unlike every other value this codebase
+// interpolates into a shell command (targetPaths, the claude binary path,
+// cmux's CLI path). Those are all a single filesystem path passed through
+// verbatim; a prompted arg is closer to "the rest of a command line" —
+// `--flag value` or `-x foo -y bar` needs its spaces to stay unquoted to
+// mean multiple shell words, which is the more common case for this field.
+// The tradeoff: an argument meant as one token but containing a space or
+// shell metacharacter (;, &&, a backtick) gets word-split or interpreted
+// rather than passed through literally. Acceptable for a personal tool
+// where the user is trusted to know they're extending their own shell
+// command, not filling in an opaque form field.
+export function applyArgs(command: string, args: string): string {
+  if (command.includes('{args}')) {
+    return command.replaceAll('{args}', args);
+  }
+  return args ? `${command} ${args}` : command;
 }
 
 export function createUtf8Decoder(): (chunk: Buffer) => string {
@@ -159,6 +184,11 @@ export function runAction(
     command = 'npm run pdf';
   } else if (project.actionType === 'analyze') {
     command = buildAnalyzeCommand(getResolvedClaudeBinary());
+  } else if (project.actionType === 'custom') {
+    if (!project.command) {
+      return;
+    }
+    command = project.command;
   } else {
     return;
   }

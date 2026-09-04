@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   ANALYSIS_PROMPT,
+  applyArgs,
   buildAnalyzeCommand,
   createUtf8Decoder,
   getResolvedClaudeBinary,
@@ -55,6 +56,24 @@ describe('buildAnalyzeCommand', () => {
   });
 });
 
+describe('applyArgs', () => {
+  it('substitutes every {args} occurrence with the given arg string', () => {
+    expect(applyArgs('deploy {args} --to {args}', 'prod')).toBe('deploy prod --to prod');
+  });
+
+  it('appends the args when the command has no {args} token', () => {
+    expect(applyArgs('npm run deploy', '--prod')).toBe('npm run deploy --prod');
+  });
+
+  it('leaves a tokenless command untouched when the arg string is empty', () => {
+    expect(applyArgs('npm run deploy', '')).toBe('npm run deploy');
+  });
+
+  it('removes the {args} token when the arg string is empty', () => {
+    expect(applyArgs('run {args}', '')).toBe('run ');
+  });
+});
+
 describe('warmClaudeBinaryCache / getResolvedClaudeBinary', () => {
   it('defaults to the bare command name before warming', () => {
     // Only meaningful if nothing earlier in this file's run already warmed
@@ -100,6 +119,36 @@ describe('runAction', () => {
     });
 
     expect(dataChunks.join('').trim()).toBe('/Users/x/My Project /Users/x/other');
+  });
+
+  it('runs a custom action\'s exact saved command string in the project directory', async () => {
+    tempDir = mkdtempSync(path.join(tmpdir(), 'sidedash-custom-'));
+
+    const project = { path: tempDir, actionType: 'custom' as const, command: 'echo from-custom && pwd' };
+    const dataChunks: string[] = [];
+
+    await new Promise<void>((resolve) => {
+      runAction(project, [], {
+        onData: (chunk) => dataChunks.push(chunk),
+        onExit: () => resolve(),
+      });
+    });
+
+    const output = dataChunks.join('').trim().split('\n');
+    expect(output[0]).toBe('from-custom');
+    // realpathSync collapses /var -> /private/var etc. so the cwd line matches.
+    expect(output[1]).toBe(realpathSync(tempDir));
+  });
+
+  it('does nothing for a custom action with no command', async () => {
+    const project = { path: tmpdir(), actionType: 'custom' as const };
+    let exited = false;
+
+    runAction(project, [], { onExit: () => { exited = true; } });
+
+    expect(isRunning(project.path)).toBe(false);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(exited).toBe(false);
   });
 
   it('clears runningProjects and reports failure when the process fails to spawn', async () => {
