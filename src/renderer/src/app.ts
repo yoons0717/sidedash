@@ -1,10 +1,10 @@
 import { handleActionExited, handleAdd, refreshProjects } from './cards';
-import { resetActionView } from './actions-view';
+import { resetProjectDetail } from './project-view';
 import { showServerView } from './servers-view';
 
 function showProjectView(): void {
   document.body.classList.remove('server-mode');
-  resetActionView();
+  resetProjectDetail();
 }
 
 async function init(): Promise<void> {
@@ -20,7 +20,7 @@ async function init(): Promise<void> {
     }
   });
   document.getElementById('server-back')!.addEventListener('click', showProjectView);
-  document.getElementById('action-back')!.addEventListener('click', showProjectView);
+  document.getElementById('detail-back')!.addEventListener('click', showProjectView);
   document.getElementById('quit-app')!.addEventListener('click', () => {
     window.api.quitApp().catch((err) => console.error('quit-app failed:', err));
   });

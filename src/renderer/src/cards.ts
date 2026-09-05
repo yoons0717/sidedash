@@ -1,17 +1,8 @@
 import type { ActionExitedPayload, ActionType, ProjectCard } from '../../shared/types';
-import { ACTION_LABELS } from '../../shared/types';
 import { setCurrentProjects } from './state';
-// Import cycle with actions-view.ts — intentional, see CLAUDE.md.
-import { showActionView } from './actions-view';
-import {
-  type CardButton,
-  clearRunning,
-  handleRunAction,
-  handleRunAnalysis,
-  handleRunCustomAction,
-  setButtonState,
-} from './card-runner';
-import { buildArgsPromptPanel, buildTargetSelectPanel, syncExpandedStyle } from './card-panels';
+// Import cycle with project-view.ts — intentional, see CLAUDE.md.
+import { showProjectDetail } from './project-view';
+import { clearRunning } from './action-runner';
 
 const ACTION_ICONS: Record<ActionType, { text: string; className: string }> = {
   pipeline: { text: '>_', className: 'icon-pipeline' },
@@ -19,7 +10,7 @@ const ACTION_ICONS: Record<ActionType, { text: string; className: string }> = {
 };
 const DEFAULT_ICON = { text: '📁', className: '' };
 
-function formatRelativeTime(isoString: string, now = new Date()): string {
+export function formatRelativeTime(isoString: string, now = new Date()): string {
   const diffMs = now.getTime() - new Date(isoString).getTime();
   if (Number.isNaN(diffMs)) return '알 수 없음';
   const minutes = Math.floor(diffMs / 60000);
@@ -41,8 +32,6 @@ function sortProjects(projects: ProjectCard[]): ProjectCard[] {
   });
 }
 
-const ANALYZE_BUTTON_LABEL = '🔍 상태 점검';
-
 // Monochrome (currentColor) so hover/opacity styling in CSS applies without
 // per-icon overrides.
 const LINK_ICONS: Record<string, string> = {
@@ -56,11 +45,9 @@ const LINK_ICONS: Record<string, string> = {
     '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M4 6.5 6.5 9 4 11.5M8 11.5h4"/></svg>',
 };
 
-// Rendered as their own row below the title (see renderCard) rather than
-// inline in the header — with icons *and* an action button both competing
-// for header space, longer project names got truncated again even after
-// switching from text labels to icons.
-function buildLinkButtons(project: ProjectCard): HTMLButtonElement[] {
+// Shared by the card's own link row and project-view.ts's detail page (same
+// links, just a bigger/spaced-out rendering there).
+export function buildLinkButtons(project: ProjectCard): HTMLButtonElement[] {
   const links: [string, string, () => void][] = [];
   if (project.githubUrl) {
     links.push(['github', 'GitHub에서 열기', () => window.api.openExternal(project.githubUrl!)]);
@@ -84,9 +71,41 @@ function buildLinkButtons(project: ProjectCard): HTMLButtonElement[] {
   });
 }
 
+// Shared by the card's branch/date line and project-view.ts's detail page
+// meta line — same two spans, each caller wraps/appends them differently.
+export function buildBranchAndDateSpans(project: ProjectCard): HTMLSpanElement[] {
+  const branchSpan = document.createElement('span');
+  branchSpan.className = 'card-branch';
+  branchSpan.textContent = project.branch ?? '(알 수 없음)';
+  const spans = [branchSpan];
+
+  if (project.lastCommit) {
+    const dateSpan = document.createElement('span');
+    dateSpan.className = 'card-detail-date';
+    dateSpan.textContent = formatRelativeTime(project.lastCommit.date);
+    spans.push(dateSpan);
+  }
+  return spans;
+}
+
+// Shared by the card and project-view.ts's detail page — null when there's
+// nothing uncommitted, so callers can just `if (line) append(line)`.
+export function buildDirtyLine(project: ProjectCard): HTMLDivElement | null {
+  if (!project.hasUncommittedChanges) return null;
+  const line = document.createElement('div');
+  line.className = 'card-dirty-toggle';
+  line.textContent = `미커밋 변경사항 ${project.changedFileCount}개`;
+  return line;
+}
+
+// A glance-only row: icon, name, remove, links, branch/commit, dirty count.
+// Everything action-producing (상태 점검, the auto-detected action, custom
+// actions) lives in project-view.ts's detail page instead — clicking
+// anywhere on the card that isn't one of its own buttons opens it.
 function renderCard(project: ProjectCard): HTMLDivElement {
   const card = document.createElement('div');
   card.className = 'card';
+  card.addEventListener('click', () => showProjectDetail(project.name));
 
   const icon = project.action ? ACTION_ICONS[project.action] : DEFAULT_ICON;
   const iconEl = document.createElement('div');
@@ -104,32 +123,6 @@ function renderCard(project: ProjectCard): HTMLDivElement {
   title.className = 'card-title';
   title.textContent = project.name;
   header.appendChild(title);
-
-  let targetSelectPanel: HTMLDivElement | null = null;
-  // Every action-producing button on this card, filled in as each is
-  // created below — passed to handleRunAction/handleRunAnalysis/
-  // handleRunCustomAction (card-runner.ts) so starting any one of them
-  // visually disables the rest too (see the comment on CardButton there).
-  const cardButtons: CardButton[] = [];
-
-  if (project.action) {
-    const actionBtn = document.createElement('button');
-    actionBtn.className = 'card-action';
-    actionBtn.dataset.path = project.path;
-    setButtonState(actionBtn, project, ACTION_LABELS[project.action]);
-    actionBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      if (project.action === 'pipeline') {
-        const isOpen = targetSelectPanel!.style.display !== 'none';
-        targetSelectPanel!.style.display = isOpen ? 'none' : 'block';
-        syncExpandedStyle(card);
-      } else {
-        handleRunAction(project, cardButtons, []);
-      }
-    });
-    cardButtons.push({ btn: actionBtn, label: ACTION_LABELS[project.action] });
-    header.appendChild(actionBtn);
-  }
 
   const removeBtn = document.createElement('button');
   removeBtn.className = 'card-remove';
@@ -159,102 +152,17 @@ function renderCard(project: ProjectCard): HTMLDivElement {
     detail.classList.add('missing');
     detail.textContent = '경로를 찾을 수 없음';
   } else {
+    const [branchSpan, dateSpan] = buildBranchAndDateSpans(project);
     const mainSpan = document.createElement('span');
     mainSpan.className = 'card-detail-main';
-    const branchSpan = document.createElement('span');
-    branchSpan.className = 'card-branch';
-    branchSpan.textContent = project.branch ?? '(알 수 없음)';
     mainSpan.appendChild(branchSpan);
     detail.appendChild(mainSpan);
-
-    if (project.lastCommit) {
-      const dateSpan = document.createElement('span');
-      dateSpan.className = 'card-detail-date';
-      dateSpan.textContent = formatRelativeTime(project.lastCommit.date);
-      detail.appendChild(dateSpan);
-    }
+    if (dateSpan) detail.appendChild(dateSpan);
   }
   body.appendChild(detail);
 
-  if (project.pathExists) {
-    const analyzeBtn = document.createElement('button');
-    analyzeBtn.className = 'card-action card-action-secondary';
-    analyzeBtn.dataset.path = project.path;
-    setButtonState(analyzeBtn, project, ANALYZE_BUTTON_LABEL);
-    analyzeBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      handleRunAnalysis(project, cardButtons);
-    });
-    cardButtons.push({ btn: analyzeBtn, label: ANALYZE_BUTTON_LABEL });
-
-    const analyzeRow = document.createElement('div');
-    analyzeRow.className = 'card-analyze-row';
-    analyzeRow.appendChild(analyzeBtn);
-    body.appendChild(analyzeRow);
-
-    const customRow = document.createElement('div');
-    customRow.className = 'card-custom-actions';
-    const argsPanels: HTMLDivElement[] = [];
-
-    for (const action of project.customActions) {
-      const pill = document.createElement('button');
-      pill.className = 'card-custom-action';
-      pill.dataset.path = project.path;
-      setButtonState(pill, project, action.label);
-      cardButtons.push({ btn: pill, label: action.label });
-
-      if (action.promptArgs) {
-        const argsPanel = buildArgsPromptPanel(project, card, cardButtons, action);
-        argsPanels.push(argsPanel);
-        pill.addEventListener('click', (event) => {
-          event.stopPropagation();
-          const isOpen = argsPanel.style.display !== 'none';
-          argsPanel.style.display = isOpen ? 'none' : 'block';
-          syncExpandedStyle(card);
-        });
-      } else {
-        pill.addEventListener('click', (event) => {
-          event.stopPropagation();
-          handleRunCustomAction(project, cardButtons, action);
-        });
-      }
-      customRow.appendChild(pill);
-    }
-
-    const manageBtn = document.createElement('button');
-    manageBtn.className = 'card-custom-action card-custom-action-manage';
-    manageBtn.textContent = project.customActions.length > 0 ? '＋' : '＋ 액션';
-    manageBtn.title = '액션 추가 / 수정 / 삭제';
-    manageBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      showActionView(project);
-    });
-    customRow.appendChild(manageBtn);
-
-    body.appendChild(customRow);
-    for (const argsPanel of argsPanels) {
-      body.appendChild(argsPanel);
-    }
-  }
-
-  if (project.hasUncommittedChanges) {
-    const dirtyLine = document.createElement('div');
-    dirtyLine.className = 'card-dirty-toggle';
-    dirtyLine.textContent = `미커밋 변경사항 ${project.changedFileCount}개`;
-    body.appendChild(dirtyLine);
-  }
-
-  if (project.action && project.lastRun) {
-    const lastRunEl = document.createElement('div');
-    lastRunEl.className = 'card-last-run';
-    lastRunEl.textContent = `마지막 실행: ${formatRelativeTime(project.lastRun)}`;
-    body.appendChild(lastRunEl);
-  }
-
-  if (project.action === 'pipeline') {
-    targetSelectPanel = buildTargetSelectPanel(project, card, cardButtons);
-    body.appendChild(targetSelectPanel);
-  }
+  const dirtyLine = buildDirtyLine(project);
+  if (dirtyLine) body.appendChild(dirtyLine);
 
   card.appendChild(body);
 

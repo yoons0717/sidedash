@@ -25,9 +25,14 @@ macOS 메뉴바에서 여러 사이드 프로젝트의 상태를 확인하고 �
 
 **프로젝트 관리**
 - 아이콘 클릭 시 프로젝트 목록 표시, 열 때마다 Git 상태 새로고침
-- GitHub / VS Code / Finder / cmux 바로 열기, 최근 커밋순 정렬
-- 미커밋 변경 파일 수 표시
+- 카드에는 훑어보기 정보만: GitHub / VS Code / Finder / cmux 바로 열기, 브랜치·마지막 커밋 시각, 미커밋 변경 파일 수, 최근 커밋순 정렬
 - ＋ / ✕ 버튼으로 등록 및 제거
+- 카드 클릭 시 프로젝트 상세 페이지로 이동 — 상태 점검, 액션 실행/관리는 전부 여기서
+
+<p align="center">
+  <img src="docs/screenshots/popup.png" alt="프로젝트 목록 팝업" width="260" />
+  <img src="docs/screenshots/detail.png" alt="프로젝트 상세 페이지" width="260" />
+</p>
 
 **실행 중인 개발 서버**
 - 🖥 버튼으로 서버 목록 뷰 전환, 열 때마다 새로고침
@@ -39,27 +44,29 @@ macOS 메뉴바에서 여러 사이드 프로젝트의 상태를 확인하고 �
 </p>
 
 **액션 실행**
-- `run.sh` → "파이프라인 실행" (대상 프로젝트 선택 → 인자 전달 → 실행 명령 미리보기)
-- `package.json`의 `scripts.pdf` → "PDF 생성"
+- 프로젝트 상세 페이지의 액션 목록에서 ▶ 버튼으로 실행 — `run.sh` → "파이프라인 실행" (대상 프로젝트 선택 → 인자 전달 → 실행 명령 미리보기), `package.json`의 `scripts.pdf` → "PDF 생성"
 - 로그 창에서 stdout / stderr 실시간 스트리밍
 - 완료 시 성공/실패 표시, 성공 시 결과 폴더 여는 버튼 + macOS 알림
 - 실행 중인 프로젝트는 버튼 비활성화로 중복 실행 방지, 종료 시도 시 확인 다이얼로그 후 정리
 
 <p align="center">
-  <img src="docs/screenshots/target-select.png" alt="대상 프로젝트 선택 패널" width="240" />
   <img src="docs/screenshots/log-window.png" alt="액션 실행 로그 창" width="420" />
 </p>
 
 **커스텀 액션**
-- 카드의 "＋ 액션"으로 프로젝트별 액션(라벨 + 셸 명령어)을 등록/수정/삭제 — 자동 감지된 파이프라인/PDF 액션과 별개로 원하는 만큼 추가
+- 프로젝트 상세 페이지의 "＋ 새 액션"으로 프로젝트별 액션(라벨 + 셸 명령어)을 등록/수정/삭제 — 자동 감지된 파이프라인/PDF 액션과 별개로 원하는 만큼 추가
 - 명령어 입력 시 `package.json` 스크립트를 클릭 한 번으로 채울 수 있는 추천 칩 표시
 - "실행 시 인자 입력받기"를 켜면 실행 전 입력값이 명령어의 `{args}` 자리에 삽입 (토큰이 없으면 뒤에 붙음)
 - "결과 폴더" 지정 시 완료 후 로그 창에 여는 버튼 표시
 
+<p align="center">
+  <img src="docs/screenshots/action-form.png" alt="새 액션 등록 폼" width="260" />
+</p>
+
 **상태 점검**
-- "🔍 상태 점검" 버튼 → Claude Code CLI(`claude -p`)가 최근 git 커밋과 소스 구조를 읽고 완성도 점수(0~100)와 다음 할 일 한 줄을 판단
+- 프로젝트 상세 페이지의 "🔍 상태 점검" 버튼 → Claude Code CLI(`claude -p`)가 최근 git 커밋과 소스 구조를 읽고 완성도 점수(0~100)와 다음 할 일 한 줄을 판단
 - 평가 기준(점수 구간별 설명)과 결과를 로그 창에 스트리밍 — 어떤 프로젝트부터 손대야 할지 판단할 재료만 보여주고, 계속할지 말지는 추천하지 않음
-- 결과는 저장하지 않고 로그 창에서만 확인 — 카드에는 아무 흔적도 남지 않으며, 다시 보려면 버튼을 다시 눌러야 함
+- 결과는 저장하지 않고 로그 창에서만 확인 — 어디에도 흔적이 남지 않으며, 다시 보려면 버튼을 다시 눌러야 함
 
 ## 데이터 레이어
 
@@ -141,10 +148,10 @@ src/
 │   ├── src/app.ts             # 엔트리포인트 — init() + 뷰 전환
 │   ├── src/app.css            # 팝업 스타일
 │   ├── src/state.ts           # 뷰 간 공유 상태
-│   ├── src/cards.ts           # 프로젝트 카드 렌더 + 목록 관리
-│   ├── src/card-runner.ts     # 액션 실행 orchestration, 버튼 상태
-│   ├── src/card-panels.ts     # 카드 안에서 펼치는 패널
-│   ├── src/actions-view.ts    # 액션 목록/폼 서브뷰
+│   ├── src/cards.ts           # 프로젝트 카드(훑어보기용) 렌더 + 목록 관리
+│   ├── src/action-runner.ts   # 액션 실행 orchestration, 버튼 상태
+│   ├── src/action-panels.ts   # 펼치는 패널 (대상 선택, 인자 입력)
+│   ├── src/project-view.ts    # 프로젝트 상세 페이지 — 링크·상태점검·액션 관리
 │   ├── src/servers-view.ts    # 실행 중인 서버 서브뷰
 │   └── logwindow.html / src/logwindow.ts
 └── shared/

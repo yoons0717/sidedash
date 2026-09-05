@@ -1,20 +1,17 @@
 import type { CustomAction, ProjectCard } from '../../shared/types';
 import { currentProjects } from './state';
-import { type CardButton, handleRunAction, handleRunCustomAction } from './card-runner';
+import { type ActionButton, handleRunAction, handleRunCustomAction } from './action-runner';
 
-// For a promptArgs action: clicking the pill expands a one-line input (same
-// expanding-panel pattern as buildTargetSelectPanel) to collect the arg
-// string before the run starts.
+// For a promptArgs action: clicking its run button toggles this one-line
+// input to collect the arg string before the run starts.
 export function buildArgsPromptPanel(
   project: ProjectCard,
-  card: HTMLElement,
-  buttons: CardButton[],
+  buttons: ActionButton[],
   action: CustomAction
 ): HTMLDivElement {
   const panel = document.createElement('div');
   panel.className = 'target-select args-prompt';
   panel.style.display = 'none';
-  panel.addEventListener('click', (event) => event.stopPropagation());
 
   const input = document.createElement('input');
   input.type = 'text';
@@ -27,21 +24,17 @@ export function buildArgsPromptPanel(
   const runBtn = document.createElement('button');
   runBtn.className = 'target-select-run';
   runBtn.textContent = '실행';
-  runBtn.addEventListener('click', (event) => {
-    event.stopPropagation();
+  runBtn.addEventListener('click', () => {
     const args = input.value.trim();
     panel.style.display = 'none';
-    syncExpandedStyle(card);
     handleRunCustomAction(project, buttons, action, args);
   });
 
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'target-select-cancel';
   cancelBtn.textContent = '취소';
-  cancelBtn.addEventListener('click', (event) => {
-    event.stopPropagation();
+  cancelBtn.addEventListener('click', () => {
     panel.style.display = 'none';
-    syncExpandedStyle(card);
   });
 
   actions.append(runBtn, cancelBtn);
@@ -49,24 +42,10 @@ export function buildArgsPromptPanel(
   return panel;
 }
 
-export function syncExpandedStyle(card: HTMLElement): void {
-  const anyOpen = [...card.querySelectorAll<HTMLElement>('.target-select')].some(
-    (panel) => panel.style.display !== 'none'
-  );
-  card.classList.toggle('expanded-style', anyOpen);
-}
-
-export function buildTargetSelectPanel(
-  project: ProjectCard,
-  card: HTMLElement,
-  buttons: CardButton[]
-): HTMLDivElement {
+export function buildTargetSelectPanel(project: ProjectCard, buttons: ActionButton[]): HTMLDivElement {
   const panel = document.createElement('div');
   panel.className = 'target-select';
   panel.style.display = 'none';
-  // Without this, clicking a checkbox (or anywhere else in the panel) would
-  // bubble up past the action button's own stopPropagation.
-  panel.addEventListener('click', (event) => event.stopPropagation());
 
   const otherProjects = currentProjects.filter((p) => p.path !== project.path);
   const checkboxes: HTMLInputElement[] = [];
@@ -119,11 +98,9 @@ export function buildTargetSelectPanel(
     const runBtn = document.createElement('button');
     runBtn.className = 'target-select-run';
     runBtn.textContent = '실행';
-    runBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
+    runBtn.addEventListener('click', () => {
       const targetPaths = checkboxes.filter((cb) => cb.checked).map((cb) => cb.dataset.path!);
       panel.style.display = 'none';
-      syncExpandedStyle(card);
       handleRunAction(project, buttons, targetPaths);
     });
     actions.appendChild(runBtn);
@@ -132,10 +109,8 @@ export function buildTargetSelectPanel(
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'target-select-cancel';
   cancelBtn.textContent = '취소';
-  cancelBtn.addEventListener('click', (event) => {
-    event.stopPropagation();
+  cancelBtn.addEventListener('click', () => {
     panel.style.display = 'none';
-    syncExpandedStyle(card);
   });
   actions.appendChild(cancelBtn);
 

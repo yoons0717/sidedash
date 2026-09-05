@@ -9,11 +9,12 @@ export function setButtonState(btn: HTMLButtonElement, project: ProjectCard, lab
   btn.textContent = running ? '실행 중…' : labelWhenIdle;
 }
 
-// A card can have any number of action-producing buttons (auto-detected
-// action, 상태 점검, custom pills), all sharing one busy guard keyed by
-// project path — so starting any one must visually disable the rest too.
-// Callers pass every button on their card, not just the one clicked.
-export type CardButton = { btn: HTMLButtonElement; label: string };
+// A project's detail page can show any number of action-producing buttons
+// (the auto-detected action, 상태 점검, custom actions), all sharing one busy
+// guard keyed by project path — so starting any one must visually disable
+// the rest too. Callers pass every such button currently on screen for that
+// project, not just the one clicked.
+export type ActionButton = { btn: HTMLButtonElement; label: string };
 
 // Marks buttons running optimistically, before the call resolves, so it
 // must be undone if nothing actually started. Exception: "already-running"
@@ -21,7 +22,7 @@ export type CardButton = { btn: HTMLButtonElement; label: string };
 // own action-exited — undoing here too would race it.
 async function runProjectAction(
   project: ProjectCard,
-  buttons: CardButton[],
+  buttons: ActionButton[],
   call: () => Promise<RunActionResult>,
   errorLabel: string
 ): Promise<void> {
@@ -48,7 +49,7 @@ async function runProjectAction(
 
 export function handleRunAction(
   project: ProjectCard,
-  buttons: CardButton[],
+  buttons: ActionButton[],
   targetPaths: string[]
 ): Promise<void> {
   return runProjectAction(
@@ -59,13 +60,13 @@ export function handleRunAction(
   );
 }
 
-export function handleRunAnalysis(project: ProjectCard, buttons: CardButton[]): Promise<void> {
+export function handleRunAnalysis(project: ProjectCard, buttons: ActionButton[]): Promise<void> {
   return runProjectAction(project, buttons, () => window.api.runAnalysis(project.path), 'run-analysis');
 }
 
 export function handleRunCustomAction(
   project: ProjectCard,
-  buttons: CardButton[],
+  buttons: ActionButton[],
   action: CustomAction,
   args?: string
 ): Promise<void> {

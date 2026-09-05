@@ -1,5 +1,5 @@
 import type { ServerInfo } from '../../shared/types';
-import { resetActionView } from './actions-view';
+import { resetProjectDetail } from './project-view';
 
 function serverDisplayName(server: ServerInfo): string {
   if (server.projectName) return server.projectName;
@@ -67,7 +67,7 @@ async function refreshServers(): Promise<void> {
 }
 
 export function showServerView(): void {
-  resetActionView();
+  resetProjectDetail();
   document.body.classList.add('server-mode');
   void refreshServers();
 }
