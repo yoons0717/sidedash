@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   detectTechStack,
   filterAndDedupeCandidates,
+  getProcessArgv,
   getProcessCwd,
+  isNonDevServerProcess,
   matchRegisteredProject,
   parseCwdOutput,
   parseListeningProcesses,
@@ -56,6 +58,33 @@ describe('filterAndDedupeCandidates', () => {
       { pid: 2, command: 'node', port: 3000 },
       { pid: 3, command: 'Python', port: 8000 },
     ]);
+  });
+});
+
+describe('isNonDevServerProcess', () => {
+  it('rejects a Serena MCP language-server process by its command line', () => {
+    expect(
+      isNonDevServerProcess('/.../Python /Users/me/.cache/uv/archive-v0/xxx/bin/serena start-mcp-server --project-from-cwd'),
+    ).toBe(true);
+  });
+
+  it('keeps a real dev server whose command line has no denied marker', () => {
+    expect(isNonDevServerProcess('/.../node /Users/me/app/node_modules/astro/bin/astro.mjs dev')).toBe(false);
+    expect(isNonDevServerProcess('/.../python manage.py runserver')).toBe(false);
+  });
+
+  it('keeps a process whose argv could not be read', () => {
+    expect(isNonDevServerProcess('')).toBe(false);
+  });
+});
+
+describe('getProcessArgv', () => {
+  it('resolves the current process command line via a real ps call', () => {
+    expect(getProcessArgv(process.pid)).toContain('node');
+  });
+
+  it('returns an empty string for a pid that does not exist', () => {
+    expect(getProcessArgv(2 ** 31 - 1)).toBe('');
   });
 });
 

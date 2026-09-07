@@ -221,6 +221,30 @@ export function killServer(pid: number): Promise<void> {
   });
 }
 
+// Editor/IDE tooling that runs on an allowlisted interpreter and listens on a
+// localhost port, but isn't a dev server — matched against the process's full
+// command line (lsof's `c` field is just the basename, "Python"). Serena (an
+// MCP language server) spawns a dashboard + tray process per project, cwd ==
+// the project root, so the scan otherwise labels them with the project's name.
+// ponytail: substring denylist, seeded with the one tool seen leaking. Add a
+// marker here when another (pylsp, pyright, ...) shows up.
+const NON_DEV_SERVER_ARGV_MARKERS = ['serena'];
+
+export function isNonDevServerProcess(argv: string): boolean {
+  return NON_DEV_SERVER_ARGV_MARKERS.some((marker) => argv.includes(marker));
+}
+
+export function getProcessArgv(pid: number): string {
+  try {
+    return execFileSync('ps', ['-o', 'command=', '-p', String(pid)], {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return '';
+  }
+}
+
 // `selfPath` is sidedash's own project root (Electron's app.getAppPath()).
 // Under `npm start`, electron-vite runs its own Vite dev server (a `node`
 // process, listening on a port, cwd == sidedash's project root) to serve
@@ -232,6 +256,7 @@ export function killServer(pid: number): Promise<void> {
 // leaving every caller to remember to filter it out.
 export function getRunningServers(registryEntries: RegistryEntry[], selfPath: string): ServerInfo[] {
   return getListeningCandidates()
+    .filter(({ pid }) => !isNonDevServerProcess(getProcessArgv(pid)))
     .map(({ pid, command, port }) => {
       const cwd = getProcessCwd(pid);
       return {
