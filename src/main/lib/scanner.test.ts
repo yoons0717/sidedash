@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { getGitStatus } from './scanner';
+import { getGitStatus, getLastCommit } from './scanner';
 import { git, setupRepo } from '../test-utils/gitRepo';
 
 describe('getGitStatus', () => {
@@ -49,5 +49,29 @@ describe('getGitStatus', () => {
   it('returns null for a path that is not a git repo', () => {
     dir = mkdtempSync(path.join(tmpdir(), 'sidedash-scanner-notgit-'));
     expect(getGitStatus(dir)).toBeNull();
+  });
+});
+
+describe('getLastCommit', () => {
+  let dir: string | undefined;
+
+  afterEach(() => {
+    if (dir) {
+      rmSync(dir, { recursive: true, force: true });
+      dir = undefined;
+    }
+  });
+
+  // A date-only value parses as UTC midnight, so relative-time display
+  // ("N시간 전") would be off by up to a day.
+  it('returns a full timestamp, not just a date', () => {
+    dir = setupRepo('sidedash-scanner-');
+    writeFileSync(path.join(dir, 'a.txt'), 'hello');
+    git(dir, ['add', '-A']);
+    git(dir, ['commit', '-q', '-m', 'init']);
+
+    const commit = getLastCommit(dir)!;
+    expect(commit.message).toBe('init');
+    expect(Math.abs(Date.now() - new Date(commit.date).getTime())).toBeLessThan(60_000);
   });
 });

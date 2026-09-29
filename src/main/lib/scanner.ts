@@ -30,7 +30,7 @@ function hasGitDir(projectPath: string): boolean {
 
 export function getLastCommit(projectPath: string): LastCommit | null {
   try {
-    const output = runGit(projectPath, ['log', '-1', '--date=short', '--format=%ad%x1f%s']);
+    const output = runGit(projectPath, ['log', '-1', '--format=%aI%x1f%s']);
     if (!output) return null;
     const [date, message] = output.split('\x1f');
     return { message, date };
