@@ -29,7 +29,7 @@ export function canAddProject(
 export function getProjectCards(historyFilePath: string): ProjectCard[] {
   return registry.getAll().map(({ name, path: projectPath, actions }) => {
     const customActions = actions ?? [];
-    const lastRun = historyFilePath ? getLastRun(historyFilePath, projectPath) : null;
+    const lastRun = getLastRun(historyFilePath, projectPath);
     const pathExists = fs.existsSync(projectPath);
     if (!pathExists) {
       return {
