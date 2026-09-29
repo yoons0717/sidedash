@@ -8,7 +8,7 @@ interface LogWindowProject {
   resultDir?: string;
 }
 
-export interface LogWindowHandle {
+interface LogWindowHandle {
   appendData: (chunk: string) => void;
   finish: (code: number | null) => void;
   focus: () => void;

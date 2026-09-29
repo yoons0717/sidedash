@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { app, ipcMain, dialog, shell, Notification } from 'electron';
 import { menubar } from 'menubar';
 import * as registry from './lib/registry';
-import { getProjectCards, canAddProject } from './ipc/projects';
+import { getProjectCards, canAddProject, findRunnableProject } from './ipc/projects';
 import { killServer, getRunningServers } from './lib/portscan';
 import {
   runAction,
@@ -14,13 +14,14 @@ import {
   shellQuote,
   warmClaudeBinaryCache,
   ANALYSIS_CRITERIA,
+  type RunnableProject,
 } from './actions/run';
 import { recordRun } from './actions/history';
-import { openLogWindow, type LogWindowHandle } from './logwindow';
+import { detectAction } from './actions/detect';
+import { openLogWindow } from './logwindow';
 import type {
   AddProjectRejectionReason,
   CustomActionInput,
-  ProjectCard,
   RunActionResult,
 } from '../shared/types';
 import { ACTION_LABELS } from '../shared/types';
@@ -229,18 +230,12 @@ ipcMain.handle('quit-app', async () => {
   app.quit();
 });
 
-// Shared by run-action/run-analysis's onExit callbacks: both notify the
-// renderer, finish the log window, and fire a completion notification —
-// only the label and (for run-action) the ACTION_LABELS lookup differ.
-function reportActionExit(project: ProjectCard, logWindow: LogWindowHandle, code: number | null, label: string): void {
-  mb.window?.webContents.send('action-exited', { path: project.path, code });
-  logWindow.finish(code);
-
-  const notification = new Notification({ title: project.name, body: formatActionResultMessage(label, code) });
-  notification.on('click', () => logWindow.focus());
-  notification.show();
-}
-
+// Shared by the three run-* handlers below, once each has resolved what to
+// run. Checks the backend-authoritative guard *before* opening the log
+// window — otherwise a suppressed duplicate run (e.g. renderer state lost
+// after a popup reload) opens a window that never receives data or an exit
+// signal.
+//
 // Return value lets the renderer tell "genuinely didn't start, re-enable the
 // button now" apart from "already running elsewhere, leave it disabled —
 // the real run's own action-exited will clear it". Collapsing both into a
@@ -248,114 +243,83 @@ function reportActionExit(project: ProjectCard, logWindow: LogWindowHandle, code
 // optimistically marks the button running before this call resolves, and
 // nothing ever un-marks it for the "didn't start" case since no run started
 // to eventually fire action-exited.
-ipcMain.handle('run-action', (_event, projectPath: string, targetPaths: string[]): RunActionResult => {
-  const cards = getProjectCards(HISTORY_FILE);
-  const project = cards.find((p) => p.path === projectPath);
-  if (!project || !project.action) {
-    return { ok: false, reason: 'invalid' };
-  }
-
-  // Check the backend-authoritative guard *before* opening the log window —
-  // otherwise a suppressed duplicate run (e.g. renderer state lost after a
-  // popup reload) opens a window that never receives data or an exit signal.
+function startRun(
+  project: RunnableProject & { name: string; resultDir?: string },
+  label: string,
+  targetPaths: string[] = [],
+  intro?: string
+): RunActionResult {
   if (isRunning(project.path)) {
     return { ok: false, reason: 'already-running' };
   }
 
-  const projectWithType = { ...project, actionType: project.action };
-  const logWindow = openLogWindow(`${project.name} · ${ACTION_LABELS[project.action]}`, projectWithType);
+  const logWindow = openLogWindow(`${project.name} · ${label}`, project);
+  if (intro) {
+    logWindow.appendData(intro);
+  }
 
-  runAction(
-    projectWithType,
-    targetPaths ?? [],
-    {
-      onData: (chunk) => logWindow.appendData(chunk),
-      onExit: (code) => {
-        if (code === 0) {
-          recordRun(HISTORY_FILE, project.path);
-        }
-        reportActionExit(project, logWindow, code, ACTION_LABELS[project.action!]);
-      },
-    }
-  );
+  runAction(project, targetPaths, {
+    onData: (chunk) => logWindow.appendData(chunk),
+    onExit: (code) => {
+      // 상태 점검 inspects the project rather than running it, so it
+      // doesn't count as its last run.
+      if (code === 0 && project.actionType !== 'analyze') {
+        recordRun(HISTORY_FILE, project.path);
+      }
+      mb.window?.webContents.send('action-exited', { path: project.path, code });
+      logWindow.finish(code);
+
+      const notification = new Notification({ title: project.name, body: formatActionResultMessage(label, code) });
+      notification.on('click', () => logWindow.focus());
+      notification.show();
+    },
+  });
 
   return { ok: true };
+}
+
+ipcMain.handle('run-action', (_event, projectPath: string, targetPaths: string[]): RunActionResult => {
+  const project = findRunnableProject(projectPath);
+  const action = project && detectAction(project.path);
+  if (!project || !action) {
+    return { ok: false, reason: 'invalid' };
+  }
+  return startRun({ ...project, actionType: action }, ACTION_LABELS[action], targetPaths);
 });
 
 const ANALYSIS_LABEL = '상태 점검';
 
 ipcMain.handle('run-analysis', (_event, projectPath: string): RunActionResult => {
-  const cards = getProjectCards(HISTORY_FILE);
-  const project = cards.find((p) => p.path === projectPath);
-  if (!project || !project.pathExists) {
+  const project = findRunnableProject(projectPath);
+  if (!project) {
     return { ok: false, reason: 'invalid' };
   }
-
-  if (isRunning(project.path)) {
-    return { ok: false, reason: 'already-running' };
-  }
-
-  const projectWithType = { ...project, actionType: 'analyze' as const };
-  const logWindow = openLogWindow(`${project.name} · ${ANALYSIS_LABEL}`, projectWithType);
   // claude -p's default text output prints nothing until the final answer
   // is ready — without this, the log window sits blank for the whole run
   // (often 30s-2m) and looks frozen rather than working.
-  logWindow.appendData(
+  return startRun(
+    { ...project, actionType: 'analyze' },
+    ANALYSIS_LABEL,
+    [],
     `🔍 점검 중입니다... (완료까지 30초~2분 정도 걸릴 수 있어요)\n\n평가 기준\n${ANALYSIS_CRITERIA}\n\n`
   );
-
-  runAction(
-    projectWithType,
-    [],
-    {
-      onData: (chunk) => logWindow.appendData(chunk),
-      onExit: (code) => {
-        reportActionExit(project, logWindow, code, ANALYSIS_LABEL);
-      },
-    }
-  );
-
-  return { ok: true };
 });
 
 ipcMain.handle(
   'run-custom-action',
   (_event, projectPath: string, actionId: string, args?: string): RunActionResult => {
-    const cards = getProjectCards(HISTORY_FILE);
-    const project = cards.find((p) => p.path === projectPath);
+    const project = findRunnableProject(projectPath);
     const action = project?.customActions.find((a) => a.id === actionId);
     // A blank command can't reach here through the form (Save is disabled
     // until both fields are non-empty), but a hand-edited registry.json can
     // still produce one — runAction() silently no-ops for it, which would
     // otherwise leave an opened, empty log window that never gets a
     // log-exit and a card stuck "실행 중…" forever.
-    if (!project || !project.pathExists || !action || !action.command) {
+    if (!project || !action || !action.command) {
       return { ok: false, reason: 'invalid' };
     }
 
-    if (isRunning(project.path)) {
-      return { ok: false, reason: 'already-running' };
-    }
-
     const command = action.promptArgs ? applyArgs(action.command, args ?? '') : action.command;
-    const projectWithType = {
-      ...project,
-      actionType: 'custom' as const,
-      command,
-      resultDir: action.resultDir,
-    };
-    const logWindow = openLogWindow(`${project.name} · ${action.label}`, projectWithType);
-
-    runAction(projectWithType, [], {
-      onData: (chunk) => logWindow.appendData(chunk),
-      onExit: (code) => {
-        if (code === 0) {
-          recordRun(HISTORY_FILE, project.path);
-        }
-        reportActionExit(project, logWindow, code, action.label);
-      },
-    });
-
-    return { ok: true };
+    return startRun({ ...project, actionType: 'custom', command, resultDir: action.resultDir }, action.label);
   }
 );

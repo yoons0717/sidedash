@@ -67,3 +67,15 @@ export function getProjectCards(historyFilePath: string): ProjectCard[] {
     };
   });
 }
+
+// For the run-* IPC handlers, which need one project and not every card —
+// getProjectCards() runs several synchronous git commands per registered
+// project, blocking the main process for all of them. Null when the project
+// is unregistered or its folder is gone (nothing can run there).
+export function findRunnableProject(projectPath: string) {
+  const entry = registry.getAll().find((p) => p.path === projectPath);
+  if (!entry || !fs.existsSync(entry.path)) {
+    return null;
+  }
+  return { name: entry.name, path: entry.path, customActions: entry.actions ?? [] };
+}
