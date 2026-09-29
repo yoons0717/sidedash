@@ -1,7 +1,7 @@
 import type { ActionExitedPayload, ActionType, ProjectCard } from '../../shared/types';
 import { setCurrentProjects } from './state';
 // Import cycle with project-view.ts — intentional, see CLAUDE.md.
-import { showProjectDetail } from './project-view';
+import { refreshProjectDetail, showProjectDetail } from './project-view';
 import { clearRunning } from './action-runner';
 
 const ACTION_ICONS: Record<ActionType, { text: string; className: string }> = {
@@ -232,7 +232,7 @@ export async function refreshProjects(): Promise<void> {
 export async function handleActionExited({ path }: ActionExitedPayload): Promise<void> {
   clearRunning(path);
   // Re-fetch rather than just resetting the button: a successful run
-  // updates lastRun on disk, and the card needs fresh data to show it
-  // without waiting for the next app restart.
+  // updates lastRun on disk, and the detail page needs fresh data to show it.
   await refreshProjects();
+  refreshProjectDetail();
 }

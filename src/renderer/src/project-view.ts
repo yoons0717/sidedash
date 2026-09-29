@@ -39,6 +39,15 @@ export function showProjectDetail(name: string): void {
   renderProjectDetail();
 }
 
+// Called once a run finishes so this page's buttons leave "실행 중…" —
+// skipped while the action form is open, which would lose unsaved input
+// (its own save/cancel re-renders the page anyway).
+export function refreshProjectDetail(): void {
+  if (currentProjectName && !document.querySelector('.action-form')) {
+    renderProjectDetail();
+  }
+}
+
 async function applyActionChange(
   call: () => Promise<ProjectCard[]>,
   errorLabel: string,
@@ -120,7 +129,7 @@ function renderProjectDetail(): void {
   const dirtyLine = buildDirtyLine(project);
   if (dirtyLine) bodyEl.appendChild(dirtyLine);
 
-  if (project.action && project.lastRun) {
+  if (project.lastRun) {
     const lastRun = document.createElement('div');
     lastRun.className = 'card-last-run';
     lastRun.textContent = `마지막 실행: ${formatRelativeTime(project.lastRun)}`;
