@@ -6,6 +6,7 @@ import type { GitStatus, LastCommit } from '../../shared/types';
 function runGit(projectPath: string, args: string[]): string {
   return execFileSync('git', ['-C', projectPath, ...args], {
     encoding: 'utf-8',
+    timeout: 5000,
     stdio: ['ignore', 'pipe', 'ignore'],
   }).trim();
 }

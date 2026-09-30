@@ -62,6 +62,7 @@ export function getListeningCandidates(): Candidate[] {
   try {
     const output = execFileSync('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-F', 'pcn'], {
       encoding: 'utf-8',
+      timeout: 5000,
       stdio: ['ignore', 'pipe', 'ignore'],
     });
     return filterAndDedupeCandidates(parseListeningProcesses(output));
@@ -86,6 +87,7 @@ export function getProcessCwd(pid: number): string | null {
     // entry loses its cwd, not that the whole scan should throw.
     const output = execFileSync('lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'], {
       encoding: 'utf-8',
+      timeout: 5000,
       stdio: ['ignore', 'pipe', 'ignore'],
     });
     return parseCwdOutput(output);
@@ -219,7 +221,7 @@ export function findDescendants(rootPid: number, psOutput: string): number[] {
 
 function listProcessTree(): string {
   try {
-    return execFileSync('ps', ['-A', '-o', 'pid=,ppid='], { encoding: 'utf-8' });
+    return execFileSync('ps', ['-A', '-o', 'pid=,ppid='], { encoding: 'utf-8', timeout: 5000 });
   } catch {
     return '';
   }
@@ -275,6 +277,7 @@ export function getProcessArgv(pid: number): string {
   try {
     return execFileSync('ps', ['-o', 'command=', '-p', String(pid)], {
       encoding: 'utf-8',
+      timeout: 5000,
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
   } catch {
