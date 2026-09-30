@@ -196,26 +196,63 @@ function isAlive(pid: number): boolean {
   }
 }
 
+// Every descendant of rootPid (children, grandchildren, ...) from
+// `ps -A -o pid=,ppid=` output.
+export function findDescendants(rootPid: number, psOutput: string): number[] {
+  const childrenOf = new Map<number, number[]>();
+  for (const line of psOutput.split('\n')) {
+    const [pid, ppid] = line.trim().split(/\s+/).map(Number);
+    if (!pid || Number.isNaN(ppid)) continue;
+    childrenOf.set(ppid, [...(childrenOf.get(ppid) ?? []), pid]);
+  }
+
+  const descendants: number[] = [];
+  const queue = [rootPid];
+  while (queue.length > 0) {
+    for (const child of childrenOf.get(queue.shift()!) ?? []) {
+      descendants.push(child);
+      queue.push(child);
+    }
+  }
+  return descendants;
+}
+
+function listProcessTree(): string {
+  try {
+    return execFileSync('ps', ['-A', '-o', 'pid=,ppid='], { encoding: 'utf-8' });
+  } catch {
+    return '';
+  }
+}
+
+function signalAll(pids: number[], signal: NodeJS.Signals): void {
+  for (const pid of pids) {
+    try {
+      process.kill(pid, signal);
+    } catch {
+      // Already gone.
+    }
+  }
+}
+
 // These are processes sidedash didn't spawn (found via lsof, not tracked as
 // a ChildProcess), so there's no 'exit' event to await and no process-group
-// leader to assume — signal the pid itself, and escalate to SIGKILL only if
-// it's still alive after a grace period (mirrors run.ts's killAllRunning).
+// leader to assume — signal the pid and its descendants by pid, and escalate
+// to SIGKILL for whatever is still alive after a grace period (mirrors
+// run.ts's killAllRunning). The tree is snapshotted before signalling: once
+// the parent dies its children get reparented to launchd and the link is lost.
 export function killServer(pid: number): Promise<void> {
+  const tree = [pid, ...findDescendants(pid, listProcessTree())];
   try {
     process.kill(pid, 'SIGTERM');
   } catch {
     return Promise.resolve();
   }
+  signalAll(tree.slice(1), 'SIGTERM');
 
   return new Promise((resolve) => {
     setTimeout(() => {
-      if (isAlive(pid)) {
-        try {
-          process.kill(pid, 'SIGKILL');
-        } catch {
-          // Already gone.
-        }
-      }
+      signalAll(tree.filter(isAlive), 'SIGKILL');
       resolve();
     }, KILL_GRACE_PERIOD_MS);
   });

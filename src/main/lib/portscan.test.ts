@@ -1,13 +1,16 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   detectTechStack,
   filterAndDedupeCandidates,
+  findDescendants,
   getProcessArgv,
   getProcessCwd,
   isNonDevServerProcess,
+  killServer,
   matchRegisteredProject,
   parseCwdOutput,
   parseListeningProcesses,
@@ -75,6 +78,29 @@ describe('isNonDevServerProcess', () => {
 
   it('keeps a process whose argv could not be read', () => {
     expect(isNonDevServerProcess('')).toBe(false);
+  });
+});
+
+describe('findDescendants', () => {
+  it('collects children and grandchildren, not siblings or the parent', () => {
+    const ps = '    1     0\n  100     1\n  200   100\n  201   100\n  300   200\n  999     1\n';
+    expect(findDescendants(100, ps).sort()).toEqual([200, 201, 300]);
+  });
+
+  it('returns nothing for a pid with no children', () => {
+    expect(findDescendants(300, '  100     1\n  300   100\n')).toEqual([]);
+  });
+});
+
+describe('killServer', () => {
+  it('kills a child that outlives its SIGTERMed parent', async () => {
+    // The backgrounded sleep would survive a pid-only kill of the shell.
+    const parent = spawn('sh', ['-c', 'sleep 60 & echo $!; wait'], { stdio: ['ignore', 'pipe', 'ignore'] });
+    const childPid = await new Promise<number>((resolve) => parent.stdout.once('data', (d) => resolve(Number(d))));
+
+    await killServer(parent.pid!);
+
+    expect(() => process.kill(childPid, 0)).toThrow();
   });
 });
 
